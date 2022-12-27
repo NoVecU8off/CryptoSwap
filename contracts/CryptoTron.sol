@@ -45,7 +45,7 @@ error Cryptotron__OwnerRightsFailure();
 error Cryptotron__ZeroingFailure();
 error Cryptotron__EmergencyRefundFailure();
 
-/**@title Cryptotron Lottery project
+/**@title CryptoGamble project
 * @author Andrey Novikov
 */
 contract CryptoTron is VRFConsumerBaseV2, AutomationCompatibleInterface {
