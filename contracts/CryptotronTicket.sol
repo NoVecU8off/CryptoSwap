@@ -15,14 +15,14 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract CryptoTronTicket is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burnable, Ownable {
+contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721URIStorage, ERC721Burnable, Ownable {
 
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIdCounter;
 
     uint[] private mintedIds;
 
-    constructor() ERC721("CryptoTronTicket", "CLT") {}
+    constructor() ERC721("CryptotronTicket", "CLT") {}
 
     function sold() external view returns (uint256 ammount) {
         ammount = mintedIds.length;

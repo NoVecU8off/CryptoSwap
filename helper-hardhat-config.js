@@ -25,8 +25,8 @@ const networkConfig = {
         keepersUpdateInterval: "30",
     },
     137: {
-        name: "polygon",
-        subscriptionId: "",
+        name: "polygonMainnet",
+        subscriptionId: "537",
         gasLane: "0xd729dc84e21ae57ffb6be0053bf2b0668aa2aaf300a2a7b2ddf7dc0bb6e875a8",
         keepersUpdateInterval: "30",
         callbackGasLimit: "500000",

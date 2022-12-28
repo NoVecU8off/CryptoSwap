@@ -42,7 +42,7 @@ module.exports = {
             saveDeployments: true,
             chainId: 1,
         },
-        polygon: {
+        polygonMainnet: {
             url: POLYGON_MAINNET_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             saveDeployments: true,
@@ -55,11 +55,12 @@ module.exports = {
             chainId: 80001, 
         },
     },
+
     etherscan: {
         apiKey: {
             goerli: ETHERSCAN_API_KEY,
             polygonMumbai: POLYGONSCAN_API_KEY,
-            polygon: POLYGONSCAN_API_KEY,
+            polygonMainnet: POLYGONSCAN_API_KEY,
         },
         customChains: [
             {
@@ -72,14 +73,14 @@ module.exports = {
                 network: "polygonMumbai",
                 chainId: 80001,
                 urls: {
-                    apiURL: "https://api-polygonscam.io/api",
-                    browserURL: "https://mumbai.polygonscan.com/",
+                    apiURL: "https://api.polygonscam.com/api",
+                    browserURL: "https://mumbai.polygonscan.com",
                 },
-                network: "polygon",
+                network: "polygonMainnet",
                 chainId: 137,
                 urls: {
-                    apiURL: "https://api-polygonscam.io/api",
-                    browserURL: "https://polygonscan.com/",
+                    apiURL: "https://api.polygonscan.com/api",
+                    browserURL: "https://polygonscan.com",
                 },
             },
         ],
@@ -93,7 +94,7 @@ module.exports = {
     },
     contractSizer: {
         runOnCompile: false,
-        only: ["Cryptotron", "CryptoTicket", "CryptoFlipper", "CryptoFlipperTicket"],
+        only: ["CryptotronLottery", "CryptotronTicket"],
     },
     namedAccounts: {
         deployer: {
@@ -115,6 +116,6 @@ module.exports = {
         ],
     },
     mocha: {
-        timeout: 500000,
+        timeout: 5000000,
     },
 }

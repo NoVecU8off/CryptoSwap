@@ -22,7 +22,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import "hardhat/console.sol";
-import "./CryptoTronTicket.sol";
+import "./CryptotronTicket.sol";
 
 /**
 * @dev interface of NFT smart contract, that provides functionality 
@@ -48,7 +48,7 @@ error Cryptotron__EmergencyRefundFailure();
 /**@title CryptoGamble project
 * @author Andrey Novikov
 */
-contract CryptoTron is VRFConsumerBaseV2, AutomationCompatibleInterface {
+contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
 
     /**
    * @dev Cryptotron state diclaration.
