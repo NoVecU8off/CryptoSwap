@@ -29,9 +29,88 @@ import "./CryptotronTicket.sol";
 * @dev for enterCryptotron function.
 */
 interface CryptoTicketInterface {
+    /**
+    * @dev returns the owner address of a specific token
+    */
     function ownerOf(uint256 tokenId) external view returns (address);
+
+    /**
+    * returns the ammount of supported tokens within current contract
+    */
     function sold() external view returns (uint256 ammount);
 }
+
+interface IERC20 {
+    /**
+    * @dev Returns the amount of tokens in existence.
+    */
+    function totalSupply() external view returns (uint256);
+
+    /**
+    * @dev Returns the amount of tokens owned by `account`.
+    */
+    function balanceOf(address account) external view returns (uint256);
+
+    /**
+    * @dev Moves `amount` tokens from the caller's account to `recipient`.
+    *
+    * Returns a boolean value indicating whether the operation succeeded.
+    *
+    * Emits a {Transfer} event.
+    */
+    function transfer(address recipient, uint256 amount) external returns (bool);
+
+    /**
+    * @dev Returns the remaining number of tokens that `spender` will be
+    * allowed to spend on behalf of `owner` through {transferFrom}. This is
+    * zero by default.
+    *
+    * This value changes when {approve} or {transferFrom} are called.
+    */
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    /**
+    * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+    *
+    * Returns a boolean value indicating whether the operation succeeded.
+    *
+    * IMPORTANT: Beware that changing an allowance with this method brings the risk
+    * that someone may use both the old and the new allowance by unfortunate
+    * transaction ordering. One possible solution to mitigate this race
+    * condition is to first reduce the spender's allowance to 0 and set the
+    * desired value afterwards:
+    * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+    *
+    * Emits an {Approval} event.
+    */
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    /**
+    * @dev Moves `amount` tokens from `sender` to `recipient` using the
+    * allowance mechanism. `amount` is then deducted from the caller's
+    * allowance.
+    *
+    * Returns a boolean value indicating whether the operation succeeded.
+    *
+    * Emits a {Transfer} event.
+    */
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+    /**
+    * @dev Emitted when `value` tokens are moved from one account (`from`) to
+    * another (`to`).
+    *
+    * Note that `value` may be zero.
+    */
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    /**
+    * @dev Emitted when the allowance of a `spender` for an `owner` is set by
+    * a call to {approve}. `value` is the new allowance.
+    */
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
 
 /**
 * @dev Errors.
@@ -61,6 +140,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     /**
    * @dev Variables.
    */
+    //IERC20 private ierc20;
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     cryptotronState private s_cryptotronState;
     bytes32 private immutable i_gasLane;
@@ -77,7 +157,8 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     address payable[] s_refunders;
     address[] private s_allWinners;
     address[] internal deprecatedContracts;
-    address private currentContract;
+    address private ticketAddress;
+    address private tokenAddress;
     address private s_recentWinner;
     address payable public owner;
     address private nullAddress = address(0x0);
@@ -89,10 +170,13 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     event RequestedCryptotronWinner(uint256 indexed requestId);
     event CryptotronEnter(address indexed player);
     event WinnerPicked(address indexed winner);
-    event AddressChanged(address indexed newAddress);
+    event TicketAddressChanged(address indexed newAddress);
+    event TokenAddressChanged(address indexed newAddress);
     event EmergencyRefund(address indexed refunder);
     event FailureWasReset(uint256 indexed timesReset);
-    event NewFunder(address indexed funder);
+    event CurrencyLanded(address indexed funder);
+    event TokensLanded(address indexed funder, uint256 indexed ammount);
+    event TokensTransfered(address indexed recipient);
 
     /**
    * @dev Replacement for the reqire(msg.sender == owner);
@@ -105,10 +189,20 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev Replacement for the reqire(currentContract == nullAddress);
+   * @dev Replacement for the reqire(ticketAddress == nullAddress);
    */
-    modifier contractRestriction() {
-        if (currentContract != nullAddress) {
+    modifier ticketContractRestriction() {
+        if (ticketAddress != nullAddress) {
+            revert Cryptotron__ZeroingFailure();
+        }
+        _;
+    }
+
+    /**
+   * @dev Replacement for the reqire(tokenAddress == nullAddress);
+   */
+    modifier tokenContractRestriction() {
+        if (tokenAddress != nullAddress) {
             revert Cryptotron__ZeroingFailure();
         }
         _;
@@ -152,7 +246,8 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         s_cryptotronState = cryptotronState.OPEN;
         s_lastTimeStamp = block.timestamp;
         owner = payable(msg.sender);
-        currentContract = nullAddress;
+        ticketAddress = nullAddress;
+        tokenAddress = nullAddress;
     }
 
     /**
@@ -191,11 +286,12 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         bytes calldata
     ) external override checkFailure {
         enterCryptotron();
+        IERC20 token = IERC20(tokenAddress);
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
             failure = true;
             revert Cryptotron__UpkeepFailed(
-                address(this).balance,
+                token.balanceOf(address(this)),
                 s_players.length,
                 uint256(s_cryptotronState)
             );
@@ -220,11 +316,13 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     function checkUpkeep(
         bytes memory
     ) public view override returns (bool upkeepNeeded, bytes memory) {
+        IERC20 token = IERC20(tokenAddress);
         bool isOpen = cryptotronState.OPEN == s_cryptotronState;
         bool timePassed = ((block.timestamp - s_lastTimeStamp) > /*7 days, dev = */ i_interval);
         bool hasPlayers = s_players.length > 0;
-        bool hasBalance = address(this).balance > 0;
-        upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
+        bool hasBalance = token.balanceOf(address(this)) > 0;
+        bool maintained = address(this).balance > 0;
+        upkeepNeeded = (timePassed && isOpen && hasBalance && maintained && hasPlayers);
         return (upkeepNeeded, "0x0");
     }
 
@@ -234,9 +332,20 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev (which means that the last draw is over). Also it's failure restrickted
    * @dev (bool failure == false) and can be called only by owner.
    */
-    function changeAddress(address newAddress) public onlyOwner checkFailure contractRestriction {
-        currentContract = newAddress;
-        emit AddressChanged(newAddress);
+    function changeTicketAddress(address newAddress) public onlyOwner checkFailure ticketContractRestriction {
+        ticketAddress = newAddress;
+        emit TicketAddressChanged(newAddress);
+    }
+
+    /**
+   * @dev This function is for changing the contract of Cryptotron Token
+   * @dev that becomes reachable only after recent address becomes nullAddress
+   * @dev (which means that the last draw is over). Also it's failure restrickted
+   * @dev (bool failure == false) and can be called only by owner.
+   */
+    function changeTokenAddress(address newAddress) public onlyOwner checkFailure tokenContractRestriction {
+        tokenAddress = newAddress;
+        emit TokenAddressChanged(newAddress);
     }
 
     /**
@@ -247,11 +356,12 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function emergencyRefund() public approveFailure {
         s_refunders.push(payable(msg.sender));
-        currentContract = nullAddress;
-        if (address(this).balance == 0) {
+        ticketAddress = nullAddress;
+        IERC20 token = IERC20(tokenAddress);
+        if (token.balanceOf(address(this)) == 0) {
             revert Cryptotron__EmergencyRefundFailure();
         } else {
-            refundAmmount = (address(this).balance / s_players.length);
+            refundAmmount = (token.balanceOf(address(this)) / s_players.length);
             for (uint i = 0; i < s_players.length; i++) {
                 s_players[i].transfer(refundAmmount);
             }
@@ -272,17 +382,29 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev This function was made just for funding the Cryptotron.
-   *
-   * @notice You can increase lottery winnings. But it is not changing
-   * @notice youre chances for the win. We are asking you to enter your
-   * @notice address as funderAddress just to store it for future. :)
+   * @dev This function was made just for funding the Cryptotron for providing
+   * @dev transactions (service) on current network with it's native currency.
    *
    * @notice Do not use this function to enter the Cryptotron.
    */
-    function fundCryptotron() public payable checkFailure {
+    function fundCryptotronService() public payable checkFailure {
         s_funders.push(payable(msg.sender));
-        emit NewFunder(msg.sender);
+        emit CurrencyLanded(msg.sender);
+    }
+
+    /**
+   * @dev This function was made just for funding the Cryptotron.
+   *
+   * @notice You can increase lottery winnings. But it is not changing
+   * @notice youre chances for the win. We are storing your address for future. :)
+   *
+   * @notice Do not use this function to enter the Cryptotron.
+   */
+    function fundCryptotronToken(uint256 _ammount) public checkFailure {
+        IERC20 token = IERC20(tokenAddress);
+        require(_ammount > 0, "Not enough sent");
+        token.transferFrom(msg.sender, address(this), _ammount);
+        emit TokensLanded(msg.sender, _ammount);
     }
 
     /**
@@ -300,17 +422,22 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         uint256, 
         uint256[] memory randomWords
     ) internal override checkFailure {
+        IERC20 token = IERC20(tokenAddress);
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
         s_allWinners.push(recentWinner);
-        deprecatedContracts.push(currentContract);
-        currentContract = nullAddress;
-        (bool success, ) = recentWinner.call{value: address(this).balance}("");
+        deprecatedContracts.push(ticketAddress);
+        ticketAddress = nullAddress;
+        address recipient = recentWinner;
+        uint256 amount = token.balanceOf(address(this));
+        uint256 trophy = (amount * 8 / 10);
+        (bool success) = token.transfer(recipient, trophy);
         if (!success) {
             failure = true;
             revert Cryptotron__TransferFailed();
         }
+        tokenAddress = nullAddress;
         s_players = new address payable[](0);
         s_lastTimeStamp = block.timestamp;
         s_cryptotronState = cryptotronState.OPEN;
@@ -324,16 +451,16 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * 
    * @notice Number of players determaned by the quantity of
    * @notice tokenIds which were minted with the actual NFT contract (you allways
-   * @notice can check the ammount of tickets, prices ect. by calling currentContract
+   * @notice can check the ammount of tickets, prices ect. by calling ticketAddress
    * @notice function on Etherscan. Path: Etherscan -> address (this) ->
-   * @notice -> Contract -> Read Contract -> currentContract -> Nft contract ->
+   * @notice -> Contract -> Read Contract -> ticketAddress -> Nft contract ->
    * @notice -> Read Contract)
    */
     function enterCryptotron() internal checkFailure {
         if (s_cryptotronState != cryptotronState.OPEN) {
             revert Cryptotron__StateFailed();
         }
-        CryptoTicketInterface cti = CryptoTicketInterface(currentContract);
+        CryptoTicketInterface cti = CryptoTicketInterface(ticketAddress);
         for (tokenId = 0; tokenId < cti.sold(); tokenId++) {
             s_players.push(payable(cti.ownerOf(tokenId)));
             emit CryptotronEnter(cti.ownerOf(tokenId));
@@ -341,12 +468,22 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }   
 
     /**
-   * @dev Returns the balance of the Cryptotron contract
+   * @dev Returns the balance of the Cryptotron contract (service)
+   * 
+   * @notice This funds are the "Service currency" of the Cryptotron
+   */
+    function getServiceBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    /**
+   * @dev Returns the balance of the Cryptotron contract (winnings)
    * 
    * @notice This funds are the "Jackpot" of the Cryptotron
    */
-    function getCryptotronBalance() public view returns (uint256) {
-        return address(this).balance;
+    function getWinningsBalance() public view returns (uint256) {
+        IERC20 token = IERC20(tokenAddress);
+        return token.balanceOf(address(this));
     }
 
     /**
@@ -362,8 +499,21 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @notice until we are done setting up a new address with
    * @notice new tickets.
    */
-    function getCurrentContract() public view returns (address) {
-        return currentContract;
+    function getTicketAddress() public view returns (address) {
+        return ticketAddress;
+    }
+
+    /**
+   * @dev Returns the address of the ERC20 token which
+   * @dev is the current draw currency.
+   * 
+   * @notice If you are getting a null address, please wait
+   * @notice until we are done setting up a new address with
+   * @notice new tickets and tokens (tokens address in the normal
+   * @notice situation will not be changed from WETH address).
+    */
+    function getTokenAddress() public view returns (address) {
+        return tokenAddress;
     }
 
     /**
