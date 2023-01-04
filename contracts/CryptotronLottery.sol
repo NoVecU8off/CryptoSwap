@@ -22,7 +22,6 @@ import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 import "hardhat/console.sol";
-import "./CryptotronTicket.sol";
 
 /**
 * @dev interface of NFT smart contract, that provides functionality 
@@ -115,14 +114,16 @@ interface IERC20 {
 /**
 * @dev Errors.
 */
-error Cryptotron__UpkeepFailed(uint256 currentBalance, uint256 numPlayers, uint256 cryptotronState);
-error Cryptotron__TransferFailed();
-error Cryptotron__StateFailed();
-error Cryptotron__FailureDetected();
-error Cryptotron__FailureUndetected();
-error Cryptotron__OwnerRightsFailure();
-error Cryptotron__ZeroingFailure();
-error Cryptotron__EmergencyRefundFailure();
+
+error UE(uint256 currentBalance, uint256 numPlayers, uint256 cryptotronState);
+error TE();
+error SE();
+error FE();
+error DE();
+error OE();
+error ZE();
+error RE();
+
 
 /**@title CryptoGamble project
 * @author Andrey Novikov
@@ -140,21 +141,19 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     /**
    * @dev Variables.
    */
-    //IERC20 private ierc20;
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     cryptotronState private s_cryptotronState;
     bytes32 private immutable i_gasLane;
     uint256 private immutable i_interval;
     uint256 private s_lastTimeStamp;
     uint256 private refundAmmount;
+    uint256 private indexOfWinner;
     uint256 private tokenId;
     uint64 private immutable i_subscriptionId;
     uint32 private immutable i_callbackGasLimit;
     uint32 private constant NUM_WORDS = 1;
     uint16 private constant REQUEST_CONFIRMATIONS = 4;
     address payable[] private s_players;
-    address payable[] s_funders;
-    address payable[] s_refunders;
     address[] private s_allWinners;
     address[] internal deprecatedContracts;
     address private ticketAddress;
@@ -183,7 +182,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     modifier onlyOwner() {
         if (msg.sender != owner) {
-            revert Cryptotron__OwnerRightsFailure();
+            revert();
         }
         _;
     }
@@ -193,7 +192,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     modifier ticketContractRestriction() {
         if (ticketAddress != nullAddress) {
-            revert Cryptotron__ZeroingFailure();
+            revert();
         }
         _;
     }
@@ -203,7 +202,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     modifier tokenContractRestriction() {
         if (tokenAddress != nullAddress) {
-            revert Cryptotron__ZeroingFailure();
+            revert();
         }
         _;
     }
@@ -213,7 +212,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     modifier checkFailure() {
         if (failure != false) {
-            revert Cryptotron__FailureDetected();
+            revert();
         }
         _;
     }
@@ -223,10 +222,12 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     modifier approveFailure() {
         if (failure != true) {
-            revert Cryptotron__FailureUndetected();
+            revert();
         }
         _;
     }
+
+    mapping(uint256 => string) private _tokenURIs;
 
     /**
    * @dev Constructor with the arguments for the VRFConsumerBaseV2
@@ -246,8 +247,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         s_cryptotronState = cryptotronState.OPEN;
         s_lastTimeStamp = block.timestamp;
         owner = payable(msg.sender);
-        ticketAddress = nullAddress;
-        tokenAddress = nullAddress;
+        ticketAddress = tokenAddress = nullAddress;
     }
 
     /**
@@ -290,7 +290,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
             failure = true;
-            revert Cryptotron__UpkeepFailed(
+            revert UE(
                 token.balanceOf(address(this)),
                 s_players.length,
                 uint256(s_cryptotronState)
@@ -348,6 +348,10 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         emit TokenAddressChanged(newAddress);
     }
 
+    // function changeWinningURI(string memory newURI) public onlyOwner {
+    //     _tokenURI = newURI;
+    // }
+
     /**
    * @dev This fuction is for refunding purchased tickets to Cryptotron
    * @dev members during an emergency (bool failure = true).
@@ -355,11 +359,10 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev Keeps track of callers of this function.
    */
     function emergencyRefund() public approveFailure {
-        s_refunders.push(payable(msg.sender));
         ticketAddress = nullAddress;
         IERC20 token = IERC20(tokenAddress);
         if (token.balanceOf(address(this)) == 0) {
-            revert Cryptotron__EmergencyRefundFailure();
+            revert RE();
         } else {
             refundAmmount = (token.balanceOf(address(this)) / s_players.length);
             for (uint i = 0; i < s_players.length; i++) {
@@ -388,7 +391,6 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @notice Do not use this function to enter the Cryptotron.
    */
     function fundCryptotronService() public payable checkFailure {
-        s_funders.push(payable(msg.sender));
         emit CurrencyLanded(msg.sender);
     }
 
@@ -402,7 +404,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function fundCryptotronToken(uint256 _ammount) public checkFailure {
         IERC20 token = IERC20(tokenAddress);
-        require(_ammount > 0, "Not enough sent");
+        require(_ammount > 0, "");
         token.transferFrom(msg.sender, address(this), _ammount);
         emit TokensLanded(msg.sender, _ammount);
     }
@@ -423,7 +425,8 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         uint256[] memory randomWords
     ) internal override checkFailure {
         IERC20 token = IERC20(tokenAddress);
-        uint256 indexOfWinner = randomWords[0] % s_players.length;
+        indexOfWinner = randomWords[0] % s_players.length;
+        uint256 _tokenId = indexOfWinner;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
         s_allWinners.push(recentWinner);
@@ -435,14 +438,20 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         (bool success) = token.transfer(recipient, trophy);
         if (!success) {
             failure = true;
-            revert Cryptotron__TransferFailed();
+            revert TE();
         }
+        // _setTokenURI(_tokenId, _tokenURI);
         tokenAddress = nullAddress;
         s_players = new address payable[](0);
         s_lastTimeStamp = block.timestamp;
         s_cryptotronState = cryptotronState.OPEN;
         emit WinnerPicked(recentWinner);
     }
+
+    // function _setTokenURI(uint256, string memory) internal override (CryptotronTicket) {
+    //     _tokenURIs[tokenId] = _tokenURI;
+    // }
+
 
     /**
    * @dev enterCryptotron is the internal function that is getting kicked off
@@ -458,7 +467,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function enterCryptotron() internal checkFailure {
         if (s_cryptotronState != cryptotronState.OPEN) {
-            revert Cryptotron__StateFailed();
+            revert();
         }
         CryptoTicketInterface cti = CryptoTicketInterface(ticketAddress);
         for (tokenId = 0; tokenId < cti.sold(); tokenId++) {
@@ -531,21 +540,6 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev Returns ammount of words (aka numbers) requested by performUpkeep.
-   */
-    function getNumWords() public pure returns (uint256) {
-        return NUM_WORDS;
-    }
-
-    /**
-   * @dev Returns how many blocks we'd like the oracle to wait before responding to
-   * @dev the request.
-   */
-    function getRequestConfirmations() public pure returns (uint256) {
-        return REQUEST_CONFIRMATIONS;
-    }
-
-    /**
    * @dev Returns previous winner.
    */
     function getRecentWinner() public view returns (address) {
@@ -560,13 +554,6 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev Returns the interval as a constructor argument for VRF.
-   */
-    function getInterval() public view returns (uint256) {
-        return i_interval;
-    }
-
-    /**
    * @dev Returns an array of all previous winners.
    */
     function getAllWinners() public view returns (address[] memory) {
@@ -576,7 +563,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     /**
    * @dev Returns true if there was a failure during the draw.
    */
-    function isFailed() public view returns (bool) {
+    function getFailed() public view returns (bool) {
         return failure;
     }
 
