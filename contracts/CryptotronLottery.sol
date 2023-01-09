@@ -16,7 +16,7 @@ limitations under the License. */
 
 /*_________________________________________CRYPTOTRON_________________________________________*/
 
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.17;
 
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
@@ -27,86 +27,97 @@ import "hardhat/console.sol";
 * @dev interface of NFT smart contract, that provides functionality 
 * @dev for enterCryptotron function.
 */
-interface CryptoTicketInterface {
+interface CryptotronTicketInterface {
     /**
-    * @dev returns the owner address of a specific token
-    */
+   * @dev returns the owner address of a specific token
+   */
     function ownerOf(uint256 tokenId) external view returns (address);
 
     /**
-    * returns the ammount of supported tokens within current contract
-    */
-    function sold() external view returns (uint256 ammount);
+   * @dev returns the amount of supported tokens within current contract
+   */
+    function sold() external view returns (uint256 totalAmountSold);
+
+    /**
+   * @dev sets the time of the next draw
+   */
+    function setDateRun(uint256 _dateRun) external; //
+
+    function setWinnerId(uint256 tokenId) external; // 
+
+    function setProcessing() external; //
+
+    function setOver() external; //
 }
 
 interface IERC20 {
     /**
-    * @dev Returns the amount of tokens in existence.
-    */
+   * @dev Returns the amount of tokens in existence.
+   */
     function totalSupply() external view returns (uint256);
 
     /**
-    * @dev Returns the amount of tokens owned by `account`.
-    */
+   * @dev Returns the amount of tokens owned by `account`.
+   */
     function balanceOf(address account) external view returns (uint256);
 
     /**
-    * @dev Moves `amount` tokens from the caller's account to `recipient`.
-    *
-    * Returns a boolean value indicating whether the operation succeeded.
-    *
-    * Emits a {Transfer} event.
-    */
+   * @dev Moves `amount` tokens from the caller's account to `recipient`.
+   *
+   * Returns a boolean value indicating whether the operation succeeded.
+   *
+   * Emits a {Transfer} event.
+   */
     function transfer(address recipient, uint256 amount) external returns (bool);
 
     /**
-    * @dev Returns the remaining number of tokens that `spender` will be
-    * allowed to spend on behalf of `owner` through {transferFrom}. This is
-    * zero by default.
-    *
-    * This value changes when {approve} or {transferFrom} are called.
-    */
+   * @dev Returns the remaining number of tokens that `spender` will be
+   * allowed to spend on behalf of `owner` through {transferFrom}. This is
+   * zero by default.
+   *
+   * This value changes when {approve} or {transferFrom} are called.
+   */
     function allowance(address owner, address spender) external view returns (uint256);
 
     /**
-    * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
-    *
-    * Returns a boolean value indicating whether the operation succeeded.
-    *
-    * IMPORTANT: Beware that changing an allowance with this method brings the risk
-    * that someone may use both the old and the new allowance by unfortunate
-    * transaction ordering. One possible solution to mitigate this race
-    * condition is to first reduce the spender's allowance to 0 and set the
-    * desired value afterwards:
-    * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
-    *
-    * Emits an {Approval} event.
-    */
+   * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+   *
+   * Returns a boolean value indicating whether the operation succeeded.
+   *
+   * IMPORTANT: Beware that changing an allowance with this method brings the risk
+   * that someone may use both the old and the new allowance by unfortunate
+   * transaction ordering. One possible solution to mitigate this race
+   * condition is to first reduce the spender's allowance to 0 and set the
+   * desired value afterwards:
+   * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+   *
+   * Emits an {Approval} event.
+   */
     function approve(address spender, uint256 amount) external returns (bool);
 
     /**
-    * @dev Moves `amount` tokens from `sender` to `recipient` using the
-    * allowance mechanism. `amount` is then deducted from the caller's
-    * allowance.
-    *
-    * Returns a boolean value indicating whether the operation succeeded.
-    *
-    * Emits a {Transfer} event.
-    */
+   * @dev Moves `amount` tokens from `sender` to `recipient` using the
+   * allowance mechanism. `amount` is then deducted from the caller's
+   * allowance.
+   *
+   * Returns a boolean value indicating whether the operation succeeded.
+   *
+   * Emits a {Transfer} event.
+   */
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 
     /**
-    * @dev Emitted when `value` tokens are moved from one account (`from`) to
-    * another (`to`).
-    *
-    * Note that `value` may be zero.
-    */
+   * @dev Emitted when `value` tokens are moved from one account (`from`) to
+   * another (`to`).
+   *
+   * Note that `value` may be zero.
+   */
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     /**
-    * @dev Emitted when the allowance of a `spender` for an `owner` is set by
-    * a call to {approve}. `value` is the new allowance.
-    */
+   * @dev Emitted when the allowance of a `spender` for an `owner` is set by
+   * a call to {approve}. `value` is the new allowance.
+   */
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
@@ -114,7 +125,6 @@ interface IERC20 {
 /**
 * @dev Errors.
 */
-
 error UE(uint256 currentBalance, uint256 numPlayers, uint256 cryptotronState);
 error TE();
 error SE();
@@ -144,11 +154,12 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     cryptotronState private s_cryptotronState;
     bytes32 private immutable i_gasLane;
-    uint256 private immutable i_interval;
+    uint256 private s_interval;
     uint256 private s_lastTimeStamp;
-    uint256 private refundAmmount;
+    uint256 private refundAmount;
     uint256 private indexOfWinner;
     uint256 private tokenId;
+    uint256 private _dateRun;
     uint64 private immutable i_subscriptionId;
     uint32 private immutable i_callbackGasLimit;
     uint32 private constant NUM_WORDS = 1;
@@ -169,13 +180,14 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     event RequestedCryptotronWinner(uint256 indexed requestId);
     event CryptotronEnter(address indexed player);
     event WinnerPicked(address indexed winner);
-    event TicketAddressChanged(address indexed newAddress);
-    event TokenAddressChanged(address indexed newAddress);
+    event TicketAddressChanged(address indexed newTicketAddress);
+    event TokenAddressChanged(address indexed newTokenAddress);
     event EmergencyRefund(address indexed refunder);
     event FailureWasReset(uint256 indexed timesReset);
     event CurrencyLanded(address indexed funder);
-    event TokensLanded(address indexed funder, uint256 indexed ammount);
+    event TokensLanded(address indexed funder, uint256 indexed amount);
     event TokensTransfered(address indexed recipient);
+    event IntervalChanged(uint256 indexed interval);
 
     /**
    * @dev Replacement for the reqire(msg.sender == owner);
@@ -241,7 +253,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
-        i_interval = interval;
+        s_interval = interval;
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
         s_cryptotronState = cryptotronState.OPEN;
@@ -311,14 +323,14 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev Checker function. When Chainlink Automation calls performUpkeep
    * @dev function it calls this checker function and waits for it to return
    * @dev boolean true so performUpkeep can proceed and make request to ChainlinkVRF. 
-   * @dev Params checked: current state, passed time, players ammount, balance of the contract.
+   * @dev Params checked: current state, passed time, players amount, balance of the contract.
    */
     function checkUpkeep(
         bytes memory
     ) public view override returns (bool upkeepNeeded, bytes memory) {
         IERC20 token = IERC20(tokenAddress);
         bool isOpen = cryptotronState.OPEN == s_cryptotronState;
-        bool timePassed = ((block.timestamp - s_lastTimeStamp) > /*7 days, dev = */ i_interval);
+        bool timePassed = ((block.timestamp - s_lastTimeStamp) > /*7 days, dev = */ s_interval);
         bool hasPlayers = s_players.length > 0;
         bool hasBalance = token.balanceOf(address(this)) > 0;
         bool maintained = address(this).balance > 0;
@@ -326,31 +338,21 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         return (upkeepNeeded, "0x0");
     }
 
-    /**
-   * @dev This function is for changing the contract of Cryptotron Tickets
-   * @dev that becomes reachable only after recent address becomes nullAddress
-   * @dev (which means that the last draw is over). Also it's failure restrickted
-   * @dev (bool failure == false) and can be called only by owner.
-   */
-    function changeTicketAddress(address newAddress) public onlyOwner checkFailure ticketContractRestriction {
-        ticketAddress = newAddress;
-        emit TicketAddressChanged(newAddress);
+    function setConditions(
+        address newTicketAddress,
+        address newTokenAddress,
+        uint256 newInterval
+    ) public onlyOwner checkFailure ticketContractRestriction {
+            ticketAddress = newTicketAddress;
+            emit TicketAddressChanged(newTicketAddress);
+            tokenAddress = newTokenAddress;
+            emit TokenAddressChanged(newTokenAddress);
+            s_interval = newInterval;
+            emit IntervalChanged(newInterval);
+            _dateRun = s_lastTimeStamp + s_interval;
+            CryptotronTicketInterface cti = CryptotronTicketInterface(ticketAddress);
+            cti.setDateRun(_dateRun);
     }
-
-    /**
-   * @dev This function is for changing the contract of Cryptotron Token
-   * @dev that becomes reachable only after recent address becomes nullAddress
-   * @dev (which means that the last draw is over). Also it's failure restrickted
-   * @dev (bool failure == false) and can be called only by owner.
-   */
-    function changeTokenAddress(address newAddress) public onlyOwner checkFailure tokenContractRestriction {
-        tokenAddress = newAddress;
-        emit TokenAddressChanged(newAddress);
-    }
-
-    // function changeWinningURI(string memory newURI) public onlyOwner {
-    //     _tokenURI = newURI;
-    // }
 
     /**
    * @dev This fuction is for refunding purchased tickets to Cryptotron
@@ -364,9 +366,9 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         if (token.balanceOf(address(this)) == 0) {
             revert RE();
         } else {
-            refundAmmount = (token.balanceOf(address(this)) / s_players.length);
+            refundAmount = (token.balanceOf(address(this)) / s_players.length);
             for (uint i = 0; i < s_players.length; i++) {
-                s_players[i].transfer(refundAmmount);
+                s_players[i].transfer(refundAmount);
             }
         }
         emit EmergencyRefund(msg.sender);
@@ -402,11 +404,11 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    *
    * @notice Do not use this function to enter the Cryptotron.
    */
-    function fundCryptotronToken(uint256 _ammount) public checkFailure {
+    function fundCryptotronToken(uint256 _amount) public checkFailure {
         IERC20 token = IERC20(tokenAddress);
-        require(_ammount > 0, "");
-        token.transferFrom(msg.sender, address(this), _ammount);
-        emit TokensLanded(msg.sender, _ammount);
+        require(_amount > 0, "");
+        token.transferFrom(msg.sender, address(this), _amount);
+        emit TokensLanded(msg.sender, _amount);
     }
 
     /**
@@ -425,13 +427,13 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         uint256[] memory randomWords
     ) internal override checkFailure {
         IERC20 token = IERC20(tokenAddress);
+        CryptotronTicketInterface cti = CryptotronTicketInterface(ticketAddress);
         indexOfWinner = randomWords[0] % s_players.length;
-        uint256 _tokenId = indexOfWinner;
+        tokenId = indexOfWinner;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
         s_allWinners.push(recentWinner);
         deprecatedContracts.push(ticketAddress);
-        ticketAddress = nullAddress;
         address recipient = recentWinner;
         uint256 amount = token.balanceOf(address(this));
         uint256 trophy = (amount * 8 / 10);
@@ -440,18 +442,15 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
             failure = true;
             revert TE();
         }
-        // _setTokenURI(_tokenId, _tokenURI);
+        cti.setWinnerId(tokenId);
+        ticketAddress = nullAddress;
         tokenAddress = nullAddress;
         s_players = new address payable[](0);
         s_lastTimeStamp = block.timestamp;
         s_cryptotronState = cryptotronState.OPEN;
+        cti.setOver();
         emit WinnerPicked(recentWinner);
     }
-
-    // function _setTokenURI(uint256, string memory) internal override (CryptotronTicket) {
-    //     _tokenURIs[tokenId] = _tokenURI;
-    // }
-
 
     /**
    * @dev enterCryptotron is the internal function that is getting kicked off
@@ -460,7 +459,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * 
    * @notice Number of players determaned by the quantity of
    * @notice tokenIds which were minted with the actual NFT contract (you allways
-   * @notice can check the ammount of tickets, prices ect. by calling ticketAddress
+   * @notice can check the amount of tickets, prices ect. by calling ticketAddress
    * @notice function on Etherscan. Path: Etherscan -> address (this) ->
    * @notice -> Contract -> Read Contract -> ticketAddress -> Nft contract ->
    * @notice -> Read Contract)
@@ -469,11 +468,12 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         if (s_cryptotronState != cryptotronState.OPEN) {
             revert();
         }
-        CryptoTicketInterface cti = CryptoTicketInterface(ticketAddress);
+        CryptotronTicketInterface cti = CryptotronTicketInterface(ticketAddress);
         for (tokenId = 0; tokenId < cti.sold(); tokenId++) {
             s_players.push(payable(cti.ownerOf(tokenId)));
             emit CryptotronEnter(cti.ownerOf(tokenId));
         }
+        cti.setProcessing();
     }   
 
     /**

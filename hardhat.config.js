@@ -94,7 +94,7 @@ module.exports = {
     },
     contractSizer: {
         runOnCompile: false,
-        only: ["CryptotronLottery", "CryptotronTicket"],
+        only: ["CryptotronLottery"],
     },
     namedAccounts: {
         deployer: {
