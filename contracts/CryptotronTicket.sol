@@ -18,11 +18,10 @@ import "./Base64.sol";
 /**
  * @dev Custom errors
  */
-error OF();
-error PF();
+error NoAnOwnerError();
+error NotALotteryError();
 
 contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
-
     enum lotteryState {
         OPEN,
         PROCESSING,
@@ -36,30 +35,26 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     using Strings for uint256;
     Counters.Counter private _tokenIdCounter;
     lotteryState private s_lotteryState;
-    address payable private owner;
-    uint256[] private mintedIds;
-    string private _wonTokenURI = "ipfs://QmTszrQX61t3xkRMAE94Mtqqjs9UnQE9GJCfWjbqZE78gi";
-    string private _averageTokenURI;
-    mapping(uint256 => string) private _tokenURIs;
-    bool private isLotteryOver = false;
-    uint256 private winnerId;
+    address payable private ownerAddress;
     address private lotteryAddress = address(payable(0x0));
-    uint256 private tokensCount = 25;
-    uint256 public dateRun;
+    uint256 private winnerId;
+    uint256 private drawDate;
+    uint256 private immutable i_tokensCount = 25;
+    bool private isLotteryOver = false;
 
     /**
    * @dev Modifiers
    */
     modifier onlyOwner() {
-        if (msg.sender != owner) {
-            revert OF();
+        if (msg.sender != ownerAddress) {
+            revert NoAnOwnerError();
         }
         _;
     }
 
     modifier onlyLottery() {
         if (msg.sender != lotteryAddress) {
-            revert PF();
+            revert NotALotteryError();
         }
         _;
     }
@@ -67,8 +62,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
    * @dev {ERC721} default constructor
    */
-    constructor() ERC721("CryptotronTicket", "CLT") {
-        owner = payable(msg.sender);
+    constructor() ERC721("CryptotronTicket", "CTT") {
+        ownerAddress = payable(msg.sender);
     }
 
     /**
@@ -77,14 +72,18 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    * called upon a safe transfer. Requires the msg.sender to be the owner, approved, or operator.
    */
     function safeMint(address to) public onlyOwner {
-        uint256 tokenId = _tokenIdCounter.current();
+        require(_tokenIdCounter.current() < i_tokensCount, "Maximum NFT count is minted");
         _tokenIdCounter.increment();
+        uint256 tokenId = _tokenIdCounter.current();
         _safeMint(to, tokenId);
-        mintedIds.push(tokenId);
     }
 
     function getDrawDate() public view returns (string memory) {
-        (uint256 year, uint256 month, uint256 day) = DateTime.timestampToDate(dateRun);
+        if (drawDate == 0){
+            return "Not Set";
+        }
+
+        (uint256 year, uint256 month, uint256 day) = DateTime.timestampToDate(drawDate);
         return string(abi.encodePacked(Strings.toString(year), '.', month < uint256(10) ? "0" : "", Strings.toString(month), '.', day < uint256(10) ? "0" : "", Strings.toString(day)));
     }
 
@@ -100,18 +99,18 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
         if (s_lotteryState == lotteryState.OPEN) {
             return "Active";
         } else if (s_lotteryState == lotteryState.PROCESSING) {
-            return "Processing";
+            return "Drawing";
         } else if (s_lotteryState == lotteryState.OVER) {
-            return "Over";
+            return "Ended";
         }
     }
 
-    function getWinStatus(uint256 tokenId) public view returns (string memory) {
+    function getDrawState(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.OVER) {
             if (tokenId == winnerId) {
-                return "Won!";
+                return "Won";
             } else {
-                return "Next time...";
+                return "Didn't win";
             }
         } else if (s_lotteryState == lotteryState.PROCESSING) {
             return "Processing";
@@ -124,6 +123,9 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    * @dev See {IERC721Metadata-tokenURI}.
    */
     function tokenURI(uint256 tokenId) override(ERC721) public view returns (string memory) {
+        require(tokenId != 0, "Incorrect token id");
+        require(tokenId <= _tokenIdCounter.current(), "Ticket does't exist");
+
         string memory json = Base64.encode(
             bytes(string(
                 abi.encodePacked(
@@ -133,11 +135,21 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
                     '"attributes": [{"trait_type": "Chance", "value": "1 to 25" },',
                     '{"trait_type": "Prize", "value": "0.1 ETH" },',
                     '{"trait_type": "Project", "value": "Cryptotron" },',
-                    '{"trait_type": "State", "value": "', getWinStatus(tokenId), '" },',
+                    '{"trait_type": "Draw State", "value": "', getDrawState(tokenId), '" },',
                     '{"trait_type": "Draw Date", "value": "', getDrawDate(), '" }',
                     '],'
-                    '"description": '
-                        '"Image generated by DALL', unicode"·" ,'E. Lottery contract address - ', getLotteryContractAddress(), '"',
+                    '"description": ',
+                        '"Cryptotron lottery is a fully smart-contract-based raffle that uses Chainlink oracle network for provably fair random numbers',
+                        '\\n','\\n',
+                        'Hold this ticket at the draw date and have a chance to win the prize',
+                        '\\n','\\n',
+                        'When the lottery is active, no one can modify or interrupt the process',
+                        '\\n',
+                        'You don', unicode"’" ,'t need to trust us because the lottery is protected by the math',
+                        '\\n','\\n',
+                        'Lottery contract address - ', getLotteryContractAddress(), ' (Polygon)',
+                        '\\n','\\n',
+                        'Image generated by DALL', unicode"·" ,'E"'
                     '}'
                 )
             )));
@@ -165,19 +177,6 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev See {ERC721-_burn}. This override additionally checks to see if a
-   * token-specific URI was set for the token, and if so, it deletes the token URI from
-   * the storage mapping.
-   */
-    function _burn(uint256 tokenId) internal virtual override {
-        super._burn(tokenId);
-
-        if (bytes(_tokenURIs[tokenId]).length != 0) {
-            delete _tokenURIs[tokenId];
-        }
-    }
-
-    /**
    * @dev Returns true if this contract implements the interface defined by interfaceId.
    */
     function supportsInterface(bytes4 interfaceId)
@@ -190,31 +189,33 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     //
-    function setDateRun(uint256 _dateRun) external onlyLottery {
+    function setDrawDate(uint256 _drawDate) external onlyLottery {
+        drawDate = _drawDate;
+    }
+
+    function setStateOpen() external onlyLottery {
         s_lotteryState = lotteryState.OPEN;
-        dateRun = _dateRun;
     }
 
     //
-    function setProcessing() external onlyLottery {
+    function setStateProcessing() external onlyLottery {
         s_lotteryState = lotteryState.PROCESSING;
     }
 
     //
-    function setOver() external onlyLottery {
+    function setStateOver() external onlyLottery {
         s_lotteryState = lotteryState.OVER;
     }
 
     //
-    function setWinnerId(uint256 tokenId) external onlyLottery {
-        winnerId = tokenId;
+    function setWinnerId(uint256 _winnerId) external onlyLottery {
+        winnerId = _winnerId;
     }
 
     /**
    * @dev Function that's being used by lottery contract to get the amount of participating tickets
    */
-    function sold() external view returns (uint256 totalAmountSold) {
-        totalAmountSold = mintedIds.length;
-        return totalAmountSold;
+    function getSoldTicketsCount() external view returns (uint256) {
+        return _tokenIdCounter.current();
     }
 }
