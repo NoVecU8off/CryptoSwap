@@ -131,7 +131,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
                 abi.encodePacked(
                     '{',
                     '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getLotteryStatus() ,'",',
-                    '"image": "https://ipfs.io/ipfs/QmWVGGW5GGoczosF8oLWnBsAddT9MQ45VSd5cZHZkWcevj?filename=winn.png",',
+                    '"image": "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png",',
                     '"attributes": [{"trait_type": "Chance", "value": "1 to 25" },',
                     '{"trait_type": "Prize", "value": "0.1 ETH" },',
                     '{"trait_type": "Project", "value": "Cryptotron" },',
