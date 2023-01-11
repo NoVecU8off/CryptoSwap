@@ -33,7 +33,6 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     log("----------------------------------------------------")
     const arguments = [
         networkConfig[chainId]["gasLane"],
-        networkConfig[chainId]["keepersUpdateInterval"],
         subscriptionId,
         networkConfig[chainId]["callbackGasLimit"],
         vrfCoordinatorV2Address,

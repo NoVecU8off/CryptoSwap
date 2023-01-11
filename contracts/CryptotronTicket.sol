@@ -22,6 +22,7 @@ error NoAnOwnerError();
 error NotALotteryError();
 
 contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
+
     enum lotteryState {
         OPEN,
         PROCESSING,
@@ -41,6 +42,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     uint256 private drawDate;
     uint256 private immutable i_tokensCount = 25;
     bool private isLotteryOver = false;
+    bool public refunded;
 
     /**
    * @dev Modifiers
@@ -67,6 +69,55 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
+   * @dev sets the beuty-looking date in "Traits"
+   */
+    function setDrawDate(uint256 _drawDate) external onlyLottery {
+        drawDate = _drawDate;
+    }
+
+    /**
+   * @dev changes the status of every ticket (in the name) to mark them as invalid (aka Refunded)
+   */
+    function setRefunded() external onlyLottery {
+        refunded = true;
+    }
+
+    /**
+   * @dev one of the initial conditions of the draw
+   */
+    function setStateOpen() external onlyLottery {
+        s_lotteryState = lotteryState.OPEN;
+    }
+
+    /**
+   * @dev displays the moment the winner is calculated
+   */
+    function setStateProcessing() external onlyLottery {
+        s_lotteryState = lotteryState.PROCESSING;
+    }
+
+    /**
+   * @dev displays the moment the winner is picked and the current draw is over
+   */
+    function setStateOver() external onlyLottery {
+        s_lotteryState = lotteryState.OVER;
+    }
+
+    /**
+   * @dev awaits for passing the winning tokenId from lottery contract
+   */
+    function setWinnerId(uint256 _winnerId) external onlyLottery {
+        winnerId = _winnerId;
+    }
+
+    /**
+   * @dev Function that's being used by lottery contract to get the amount of participating tickets
+   */
+    function getSoldTicketsCount() external view returns (uint256) {
+        return _tokenIdCounter.current();
+    }
+
+    /**
    * @dev  Safely transfers the ownership of a given token ID to another address If the target 
    * address is a contract, it must implement {IERC721Receiver.onERC721Received}, which is 
    * called upon a safe transfer. Requires the msg.sender to be the owner, approved, or operator.
@@ -78,15 +129,28 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
         _safeMint(to, tokenId);
     }
 
+    /**
+   * @dev used for setting lottery contract address
+   */
+    function _setLotteryAddress(address _lotteryAddress) public onlyOwner {
+        lotteryAddress = payable(_lotteryAddress);
+    }
+
+    /**
+   * @dev returns the beauty-looking date of the draw
+   */
     function getDrawDate() public view returns (string memory) {
         if (drawDate == 0){
-            return "Not Set";
+            return "Not Set Yet";
         }
 
         (uint256 year, uint256 month, uint256 day) = DateTime.timestampToDate(drawDate);
         return string(abi.encodePacked(Strings.toString(year), '.', month < uint256(10) ? "0" : "", Strings.toString(month), '.', day < uint256(10) ? "0" : "", Strings.toString(day)));
     }
 
+    /**
+   * @dev use to see the lottery address
+   */
     function getLotteryContractAddress() public view returns (string memory){
         if (lotteryAddress == address(0x0)) {
             return "Not assigned";
@@ -95,6 +159,21 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
         }
     }
 
+    /**
+   * @dev Returns true if this contract implements the interface defined by interfaceId.
+   */
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    /**
+   * @dev returns the status (in the name tag) of the ticket (and lottery)
+   */
     function getLotteryStatus() public view returns (string memory) {
         if (s_lotteryState == lotteryState.OPEN) {
             return "Active";
@@ -102,9 +181,14 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
             return "Drawing";
         } else if (s_lotteryState == lotteryState.OVER) {
             return "Ended";
+        } else if (refunded == true) {
+            return "Refunded";
         }
     }
 
+    /**
+   * @dev sets the trait type for indicating the status of the draw
+   */
     function getDrawState(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.OVER) {
             if (tokenId == winnerId) {
@@ -120,7 +204,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev See {IERC721Metadata-tokenURI}.
+   * @dev mixed on-chain and off-xhain metadata
    */
     function tokenURI(uint256 tokenId) override(ERC721) public view returns (string memory) {
         require(tokenId != 0, "Incorrect token id");
@@ -154,13 +238,6 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
                 )
             )));
         return string(abi.encodePacked('data:application/json;base64,', json));
-    }    
-
-    /**
-   * @dev used for setting lottery contract
-   */
-    function _setLotteryAddress(address _lotteryAddress) public onlyOwner {
-        lotteryAddress = payable(_lotteryAddress);
     }
 
     /**
@@ -176,46 +253,4 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 
-    /**
-   * @dev Returns true if this contract implements the interface defined by interfaceId.
-   */
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, ERC721Enumerable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
-    }
-
-    //
-    function setDrawDate(uint256 _drawDate) external onlyLottery {
-        drawDate = _drawDate;
-    }
-
-    function setStateOpen() external onlyLottery {
-        s_lotteryState = lotteryState.OPEN;
-    }
-
-    //
-    function setStateProcessing() external onlyLottery {
-        s_lotteryState = lotteryState.PROCESSING;
-    }
-
-    //
-    function setStateOver() external onlyLottery {
-        s_lotteryState = lotteryState.OVER;
-    }
-
-    //
-    function setWinnerId(uint256 _winnerId) external onlyLottery {
-        winnerId = _winnerId;
-    }
-
-    /**
-   * @dev Function that's being used by lottery contract to get the amount of participating tickets
-   */
-    function getSoldTicketsCount() external view returns (uint256) {
-        return _tokenIdCounter.current();
-    }
 }
