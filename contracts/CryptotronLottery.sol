@@ -24,32 +24,32 @@ import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.s
 import "hardhat/console.sol";
 
 /**
-* @dev interface of NFT smart contract, that provides functionality 
-* @dev for enterCryptotron function.
+* @dev interface of NFT smart contract (aka the Ticket), that provides functionality 
+* @dev for entering the draw and setting the states for both contracts.
 */
 interface CryptotronTicketInterface {
     /**
-   * @dev returns the owner address of a specific token
+   * @dev returns the owner address of a specific token.
    */
     function ownerOf(uint256 tokenId) external view returns (address);
 
     /**
-   * @dev returns the amount of supported tokens within current contract
+   * @dev returns the amount of supported tokens within current contract.
    */
     function getSoldTicketsCount() external view returns (uint256);
 
     /**
-   * @dev sets the time of the next draw
+   * @dev sets the time of the next draw.
    */
     function setDrawDate(uint256 _drawDate) external; //
 
     /**
-   * @dev sets the winner tokenId
+   * @dev sets the winner tokenId.
    */
     function setWinnerId(uint256 _winnerId) external; // 
 
     /**
-   * activate different states of NFT contract
+   * activate different states of NFT contract.
    */
     function setStateOpen() external; //
 
@@ -60,6 +60,10 @@ interface CryptotronTicketInterface {
     function setRefunded() external;
 }
 
+/**
+ * @dev Interface of ERC20 token that's used for winnings currency in this 
+ * @dev project.
+ */
 interface IERC20 {
     /**
    * @dev Returns the amount of tokens in existence.
@@ -144,7 +148,7 @@ error OE();
 error ZE();
 
 
-/**@title CryptoGamble project
+/**@title Cryptotron project
 * @author Andrey Novikov
 */
 contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
@@ -219,7 +223,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev Constructor with the arguments for the VRFConsumerBaseV2
+   * @dev Constructor with the arguments for the VRFConsumerBaseV2.
    */
     constructor(
         bytes32 gasLane,
@@ -315,7 +319,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev sets all parameters needed (including both contracts)
+   * @dev sets all parameters needed (including both contracts).
    */
     function activate(
         address newNftAdress,
@@ -425,7 +429,8 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev refreshes the states of the lottery (in case of unexpected errors)
+   * @dev refreshes the states of the lottery (in case of unexpected errors
+   * @dev that are not related to the logic and math of this contract).
    */
     function reset() private onlyIfDrawNotFailed onlyIfLotteryIsActive{
         nftAddress = nullAddress;
@@ -435,18 +440,18 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev Returns the balance of the Cryptotron contract (Native)
+   * @dev Returns the balance of the Cryptotron contract (Native).
    * 
-   * @notice This funds are the "Native currency" of the Cryptotron
+   * @notice This funds are the "Native currency" of the Cryptotron.
    */
     function getNativeBalance() public view returns (uint256) {
         return address(this).balance;
     }
 
     /**
-   * @dev Returns the balance of the Cryptotron contract (winnings)
+   * @dev Returns the balance of the Cryptotron contract (winnings).
    * 
-   * @notice This funds are the "Jackpot" of the Cryptotron
+   * @notice This funds are the "Winnings" of the Cryptotron.
    */
     function getRewardAmount() public view returns (uint256) {
         IERC20 token = IERC20(rewardTokenAddress);
@@ -455,7 +460,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
 
     /**
    * @dev Returns the address of the NFT contract on which
-   * @dev the tickets for the current draw were minted
+   * @dev the tickets for the current draw were minted.
    * 
    * @notice If you want to participate in the next draw
    * @notice you need to buy a ticket with the contract address
