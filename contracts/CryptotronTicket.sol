@@ -133,13 +133,13 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
    * @dev used for setting lottery contract address.
    */
-    function _setLotteryAddress(address _lotteryAddress) public onlyOwner {
+    function setLotteryAddress(address _lotteryAddress) public onlyOwner {
         lotteryAddress = payable(_lotteryAddress);
     }
 
     function getImage(uint256 tokenId) public view returns (string memory) {
         if (tokenId == winnerId) {
-                return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png"; //change!
+                return "https://ipfs.io/ipfs/QmRQYhTUqKez8BdM4UCBZUTntDxRXD9RVxdXb8Czb32mHm?filename=winnerTicket.png"; //change!
             } else {
                 return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png";
             }
@@ -224,11 +224,11 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
                 abi.encodePacked(
                     '{',
                     '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getLotteryStatus() ,'",',
-                    '"image": ', getImage(tokenId), ',',
+                    '"image": "', getImage(tokenId), '",',
                     '"attributes": [{"trait_type": "Chance", "value": "1 to 25" },',
                     '{"trait_type": "Prize", "value": "0.1 ETH" },',
                     '{"trait_type": "Project", "value": "Cryptotron" },',
-                    '{"trait_type": "Draw State", "value": "', getDrawState(tokenId), '" },',
+                    '{"trait_type": "Ticket Status", "value": "', getDrawState(tokenId), '" },',
                     '{"trait_type": "Draw Date", "value": "', getDrawDate(), '" }',
                     '],'
                     '"description": ',
