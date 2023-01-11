@@ -41,23 +41,23 @@ interface CryptotronTicketInterface {
     /**
    * @dev sets the time of the next draw.
    */
-    function setDrawDate(uint256 _drawDate) external; //
+    function setDrawDate(uint256 _drawDate) external;
 
     /**
    * @dev sets the winner tokenId.
    */
-    function setWinnerId(uint256 _winnerId) external; // 
+    function setWinnerId(uint256 _winnerId) external;
 
     /**
    * activate different states of NFT contract.
    */
-    function setStateOpen() external; //
+    function setStateOpen() external;
 
-    function setStateProcessing() external; //
+    function setStateProcessing() external;
 
-    function setStateOver() external; //
+    function setStateOver() external;
 
-    function setRefunded() external;
+    function setStateRefunded() external;
 }
 
 /**
@@ -350,7 +350,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         }
 
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
-        cti.setRefunded();
+        cti.setStateRefunded();
 
         IERC20 token = IERC20(rewardTokenAddress);
         if (token.balanceOf(address(this)) != 0) {

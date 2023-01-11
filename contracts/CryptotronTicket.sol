@@ -16,7 +16,7 @@ import "./DateTime.sol";
 import "./Base64.sol";
 
 /**
- * @dev Custom errors
+ * @dev Custom errors.
  */
 error NoAnOwnerError();
 error NotALotteryError();
@@ -26,11 +26,12 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     enum lotteryState {
         OPEN,
         PROCESSING,
-        OVER
+        OVER,
+        REFUNDED
     }
 
     /**
-   * @dev Type declarations
+   * @dev Type declarations.
    */
     using Counters for Counters.Counter;
     using Strings for uint256;
@@ -45,7 +46,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     bool public refunded;
 
     /**
-   * @dev Modifiers
+   * @dev Modifiers.
    */
     modifier onlyOwner() {
         if (msg.sender != ownerAddress) {
@@ -62,56 +63,56 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev {ERC721} default constructor
+   * @dev {ERC721} default constructor.
    */
     constructor() ERC721("CryptotronTicket", "CTT") {
         ownerAddress = payable(msg.sender);
     }
 
     /**
-   * @dev sets the beuty-looking date in "Traits"
+   * @dev sets the beuty-looking date in "Traits".
    */
     function setDrawDate(uint256 _drawDate) external onlyLottery {
         drawDate = _drawDate;
     }
 
     /**
-   * @dev changes the status of every ticket (in the name) to mark them as invalid (aka Refunded)
+   * @dev changes the status of every ticket (next to the name) to mark them as invalid (aka Refunded).
    */
-    function setRefunded() external onlyLottery {
-        refunded = true;
+    function setStateRefunded() external onlyLottery {
+        s_lotteryState = lotteryState.REFUNDED;
     }
 
     /**
-   * @dev one of the initial conditions of the draw
+   * @dev one of the initial conditions of the draw.
    */
     function setStateOpen() external onlyLottery {
         s_lotteryState = lotteryState.OPEN;
     }
 
     /**
-   * @dev displays the moment the winner is calculated
+   * @dev displays the moment the winner is calculated.
    */
     function setStateProcessing() external onlyLottery {
         s_lotteryState = lotteryState.PROCESSING;
     }
 
     /**
-   * @dev displays the moment the winner is picked and the current draw is over
+   * @dev displays the moment the winner is picked and the current draw is over.
    */
     function setStateOver() external onlyLottery {
         s_lotteryState = lotteryState.OVER;
     }
 
     /**
-   * @dev awaits for passing the winning tokenId from lottery contract
+   * @dev awaits for passing the winning tokenId from lottery contract.
    */
     function setWinnerId(uint256 _winnerId) external onlyLottery {
         winnerId = _winnerId;
     }
 
     /**
-   * @dev Function that's being used by lottery contract to get the amount of participating tickets
+   * @dev Function that's being used by lottery contract to get the amount of participating tickets.
    */
     function getSoldTicketsCount() external view returns (uint256) {
         return _tokenIdCounter.current();
@@ -130,14 +131,22 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev used for setting lottery contract address
+   * @dev used for setting lottery contract address.
    */
     function _setLotteryAddress(address _lotteryAddress) public onlyOwner {
         lotteryAddress = payable(_lotteryAddress);
     }
 
+    function getImage(uint256 tokenId) public view returns (string memory) {
+        if (tokenId == winnerId) {
+                return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png"; //change!
+            } else {
+                return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png";
+            }
+    }
+
     /**
-   * @dev returns the beauty-looking date of the draw
+   * @dev returns the beauty-looking date of the draw.
    */
     function getDrawDate() public view returns (string memory) {
         if (drawDate == 0){
@@ -149,7 +158,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev use to see the lottery address
+   * @dev use it to see the lottery address.
    */
     function getLotteryContractAddress() public view returns (string memory){
         if (lotteryAddress == address(0x0)) {
@@ -172,7 +181,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev returns the status (in the name tag) of the ticket (and lottery)
+   * @dev returns the status (in the name tag) of the ticket (and lottery).
    */
     function getLotteryStatus() public view returns (string memory) {
         if (s_lotteryState == lotteryState.OPEN) {
@@ -181,13 +190,13 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
             return "Drawing";
         } else if (s_lotteryState == lotteryState.OVER) {
             return "Ended";
-        } else if (refunded == true) {
+        } else if (s_lotteryState == lotteryState.REFUNDED) {
             return "Refunded";
         }
     }
 
     /**
-   * @dev sets the trait type for indicating the status of the draw
+   * @dev sets the trait type for indicating the status of the draw.
    */
     function getDrawState(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.OVER) {
@@ -204,7 +213,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev mixed on-chain and off-xhain metadata
+   * @dev mixed on-chain and off-xhain metadata.
    */
     function tokenURI(uint256 tokenId) override(ERC721) public view returns (string memory) {
         require(tokenId != 0, "Incorrect token id");
@@ -215,7 +224,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
                 abi.encodePacked(
                     '{',
                     '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getLotteryStatus() ,'",',
-                    '"image": "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png",',
+                    '"image": ', getImage(tokenId), ',',
                     '"attributes": [{"trait_type": "Chance", "value": "1 to 25" },',
                     '{"trait_type": "Prize", "value": "0.1 ETH" },',
                     '{"trait_type": "Project", "value": "Cryptotron" },',
@@ -241,7 +250,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * Hook, which is being used for implementing IERC721Receiver
+   * Hook, which is being used for implementing IERC721Receiver.
    */
     function _beforeTokenTransfer(
         address from, 
