@@ -2,9 +2,33 @@
 
 /// @custom:created-with-openzeppelin-wizard https://wizard.openzeppelin.com
 
-/// @custom:security-contact andrewnovikoff@outlook.com
 
-/*_________________________________________CRYPTOTRON_________________________________________*/
+/*
+                        ::                                                      
+                     .JG&#~                                                     
+                      ?@@@&?                                                    
+                       ~#@@@5                                                   
+                        :G@@@G!!!!!!!!!!!!!!!!!!!!!!:                           
+                          Y@@@@@@@@@@@@@@@@@@@@@@@@@#!                          
+                           75YYYYYYYYYYYYYYYYYYYY5&@@@J                         
+                                                  ^B@@@5.                       
+                                                   .P@@@B^                      
+                     ~~.                             J@@@#!                     
+                    ?@@#Y       .:            :.      !&@@@?                    
+                  .5@@@B~      :B&!          !&B:      ^B@@@5.                  
+                 :B@@@P.      ~#@@@J        J@@@#~      .P@@@B:                 
+                !#@@&J       ?@@@@@@P.    .P@@@@@@?       J&@@#!                
+               ^&@@@5       !@@@@@@@@Y    Y@@@@@@@@!       5@@@&^               
+                !#@@&J       ~B@@@@&?      ?&@@@@B~       J&@@#!                
+                 :G@@@P.       ?&@5:        :5@&?       .P@@@G:                 
+                  .5@@@B^       ^!            !^       ^B@@@5.                  
+                    ?@@@&7                            7&@@@?                    
+                     !#@@@J                          J@@@#!                     
+                      :B@@@P.                      .P@@@B:                      
+                       .5@@@B^                    ^B@@@5.                       
+                         ?@@@&55555555555555555555&@@@?                         
+                          !#@@@@@@@@@@@@@@@@@@@@@@@@#!                          
+*/
 
 pragma solidity ^0.8.17;
 
@@ -83,8 +107,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
     * @dev sets the beuty-looking date in "Traits".
     */
-    function setDrawDate(uint256 newDrawDate) external onlyLottery {
-        drawDate = newDrawDate;
+    function setDrawDate(uint256 passDrawDate) external onlyLottery {
+        drawDate = passDrawDate;
         emit SetDrawDate(msg.sender);
     }
 

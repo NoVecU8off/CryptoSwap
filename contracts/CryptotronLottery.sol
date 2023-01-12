@@ -1,20 +1,31 @@
-/* Copyright 2022 Andrey Novikov
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
-
 // SPDX-License-Identifier: Apache-2.0
 
-/*_________________________________________CRYPTOTRON_________________________________________*/
+/*
+                        ::                                                      
+                     .JG&#~                                                     
+                      ?@@@&?                                                    
+                       ~#@@@5                                                   
+                        :G@@@G!!!!!!!!!!!!!!!!!!!!!!:                           
+                          Y@@@@@@@@@@@@@@@@@@@@@@@@@#!                          
+                           75YYYYYYYYYYYYYYYYYYYY5&@@@J                         
+                                                  ^B@@@5.                       
+                                                   .P@@@B^                      
+                     ~~.                             J@@@#!                     
+                    ?@@#Y       .:            :.      !&@@@?                    
+                  .5@@@B~      :B&!          !&B:      ^B@@@5.                  
+                 :B@@@P.      ~#@@@J        J@@@#~      .P@@@B:                 
+                !#@@&J       ?@@@@@@P.    .P@@@@@@?       J&@@#!                
+               ^&@@@5       !@@@@@@@@Y    Y@@@@@@@@!       5@@@&^               
+                !#@@&J       ~B@@@@&?      ?&@@@@B~       J&@@#!                
+                 :G@@@P.       ?&@5:        :5@&?       .P@@@G:                 
+                  .5@@@B^       ^!            !^       ^B@@@5.                  
+                    ?@@@&7                            7&@@@?                    
+                     !#@@@J                          J@@@#!                     
+                      :B@@@P.                      .P@@@B:                      
+                       .5@@@B^                    ^B@@@5.                       
+                         ?@@@&55555555555555555555&@@@?                         
+                          !#@@@@@@@@@@@@@@@@@@@@@@@@#!                          
+*/
 
 pragma solidity ^0.8.17;
 
@@ -41,7 +52,7 @@ interface CryptotronTicketInterface {
     /**
     * @dev sets the time of the next draw.
     */
-    function setDrawDate(uint256 newDrawDate) external;
+    function setDrawDate(uint256 passDrawDate) external;
 
     /**
     * @dev sets the winner tokenId.
@@ -147,11 +158,9 @@ error FailStatusError();
 error ActiveStatusError();
 
 /**
-* @title Cryptotron Lottery project ||
-* @author Andrey Novikov ||
-* @notice If you have any problems, please contact us at
-* @notice andrewnovikoff@outlook.com || 
+* @title Cryptotron Lottery project 
 */
+
 contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
 
     /**
@@ -171,7 +180,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     address private nullAddress = address(0x0);
     address private nftAddress;
     address private rewardTokenAddress;
-    uint256 private newDrawDate;
+    uint256 private passDrawDate;
     bool private isDrawFailed;
     bool private isDrawProcessActive;
     bool private isLotteryActive;
@@ -315,7 +324,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         bytes memory
     ) public view override returns (bool upkeepNeeded, bytes memory) {
         IERC20 token = IERC20(rewardTokenAddress);
-        bool timePassed = block.timestamp > newDrawDate;
+        bool timePassed = block.timestamp > passDrawDate;
         bool hasPlayers = CryptotronTicketInterface(nftAddress).getSoldTicketsCount() > 0;
         bool hasBalance = token.balanceOf(address(this)) > 0;
         bool hasGasCoin = address(this).balance > 0;
@@ -333,10 +342,10 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     ) public onlyOwner ifNotFailed ifNotActive {
             nftAddress = newNftAdress;
             rewardTokenAddress = newRewardTokenAddress;
-            newDrawDate = newDrawDate;
+            passDrawDate = newDrawDate;
 
             CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
-            cti.setDrawDate(newDrawDate);
+            cti.setDrawDate(passDrawDate);
             cti.setStateOpen();
 
             isLotteryActive = true;
@@ -353,7 +362,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     * @notice have passed since the scheduled draw date.
     */
     function refund() public ifActive {
-        if (block.timestamp < newDrawDate + ONE_DAY_IN_SEC && isDrawFailed == false) {
+        if (block.timestamp < passDrawDate + ONE_DAY_IN_SEC && isDrawFailed == false) {
             revert RefundError();
         }
 
@@ -448,13 +457,13 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     /**
     * @dev returns the addresses of the ticket holders participating in the draw.
     * 
-    * @notice if you don't get your address via this function, please contact us via email. 
+    * @notice if you don't get your address via this function, please contact us.
     */
-    function getParticipantByTokenId() public view returns (address[] memory) {
+    function getParticipants() public view returns (address[] memory) {
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
 
         address[] memory participants = new address[](cti.getSoldTicketsCount());
-        for (uint256 tokenId = 1; tokenId < cti.getSoldTicketsCount(); tokenId++) {
+        for (uint256 tokenId = 1; tokenId < cti.getSoldTicketsCount() + 1; tokenId++) {
             participants[tokenId - 1] = cti.ownerOf(tokenId);
         }
         return participants;
@@ -513,7 +522,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     * @dev Returns the value in seconds when the recent draw was played.
     */
     function getDrawDate() public view returns (uint256) {
-        return newDrawDate;
+        return passDrawDate;
     }
 
     /**
