@@ -355,7 +355,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @notice have passed since the scheduled draw date.
    */
     function refund() public ifActive {
-        if (block.timestamp < _drawDate + ONE_DAY_IN_SEC || isDrawFailed == false) {
+        if (block.timestamp < _drawDate + ONE_DAY_IN_SEC && isDrawFailed == false) {
             revert();
         }
 
