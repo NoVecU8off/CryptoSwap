@@ -31,8 +31,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-     * @dev Type declarations.
-     */
+    * @dev Type declarations.
+    */
     using Counters for Counters.Counter;
     using Strings for uint256;
     Counters.Counter private _tokenIdCounter;
@@ -45,8 +45,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     bool private isLotteryOver = false;
 
     /**
-   * @dev events.
-   */
+    * @dev events.
+    */
     event SetDrawDate(address indexed operator);
     event SetStatusRefunded(address indexed operator);
     event SetStatusProcessing(address indexed operator);
@@ -57,8 +57,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     event Minted(address indexed recipient);
 
     /**
-   * @dev Modifiers.
-   */
+    * @dev Modifiers.
+    */
     modifier onlyOwner() {
         if (msg.sender != ownerAddress) {
             revert NoAnOwner();
@@ -74,72 +74,72 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev {ERC721} default constructor.
-   */
+    * @dev {ERC721} default constructor.
+    */
     constructor() ERC721("CryptotronTicket", "CTT") {
         ownerAddress = payable(msg.sender);
     }
 
     /**
-   * @dev sets the beuty-looking date in "Traits".
-   */
+    * @dev sets the beuty-looking date in "Traits".
+    */
     function setDrawDate(uint256 newDrawDate) external onlyLottery {
         drawDate = newDrawDate;
         emit SetDrawDate(msg.sender);
     }
 
     /**
-   * @dev changes the status of every ticket (next to the name) to mark them as invalid (aka Refunded).
-   */
+    * @dev changes the status of every ticket (next to the name) to mark them as invalid (aka Refunded).
+    */
     function setStateRefunded() external onlyLottery {
         s_lotteryState = lotteryState.REFUNDED;
         emit SetStatusRefunded(msg.sender);
     }
 
     /**
-   * @dev one of the initial conditions of the draw.
-   */
+    * @dev one of the initial conditions of the draw.
+    */
     function setStateOpen() external onlyLottery {
         s_lotteryState = lotteryState.OPEN;
         emit SetStatusOpen(msg.sender);
     }
 
     /**
-   * @dev displays the moment the winner is calculated.
-   */
+    * @dev displays the moment the winner is calculated.
+    */
     function setStateProcessing() external onlyLottery {
         s_lotteryState = lotteryState.PROCESSING;
         emit SetStatusProcessing(msg.sender);
     }
 
     /**
-   * @dev displays the moment the winner is picked and the current draw is over.
-   */
+    * @dev displays the moment the winner is picked and the current draw is over.
+    */
     function setStateOver() external onlyLottery {
         s_lotteryState = lotteryState.OVER;
         emit SetStatusOver(msg.sender);
     }
 
     /**
-   * @dev awaits for passing the winning tokenId from lottery contract.
-   */
+    * @dev awaits for passing the winning tokenId from lottery contract.
+    */
     function setWinnerId(uint256 _winnerId) external onlyLottery {
         winnerId = _winnerId;
         emit WinnerIdSet(msg.sender);
     }
 
     /**
-   * @dev Function that's being used by lottery contract to get the amount of participating tickets.
-   */
+    * @dev Function that's being used by lottery contract to get the amount of participating tickets.
+    */
     function getSoldTicketsCount() external view returns (uint256) {
         return _tokenIdCounter.current();
     }
 
     /**
-   * @dev  Safely transfers the ownership of a given token ID to another address If the target 
-   * address is a contract, it must implement {IERC721Receiver.onERC721Received}, which is 
-   * called upon a safe transfer. Requires the msg.sender to be the owner, approved, or operator.
-   */
+    * @dev  Safely transfers the ownership of a given token ID to another address If the target 
+    * address is a contract, it must implement {IERC721Receiver.onERC721Received}, which is 
+    * called upon a safe transfer. Requires the msg.sender to be the owner, approved, or operator.
+    */
     function safeMint(address to) public onlyOwner {
         require(_tokenIdCounter.current() < i_tokensCount, "Maximum NFT count is minted");
         _tokenIdCounter.increment();
@@ -149,8 +149,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev used for setting lottery contract address.
-   */
+    * @dev used for setting lottery contract address.
+    */
     function setLotteryAddress(address _lotteryAddress) public onlyOwner {
         lotteryAddress = payable(_lotteryAddress);
     }
@@ -164,8 +164,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev returns the beauty-looking date of the draw.
-   */
+    * @dev returns the beauty-looking date of the draw.
+    */
     function getDrawDate() public view returns (string memory) {
         if (drawDate == 0){
             return "Not Set Yet";
@@ -176,8 +176,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev use it to see the lottery address.
-   */
+    * @dev use it to see the lottery address.
+    */
     function getLotteryContractAddress() public view returns (string memory){
         if (lotteryAddress == address(0x0)) {
             return "Not assigned";
@@ -187,8 +187,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev Returns true if this contract implements the interface defined by interfaceId.
-   */
+    * @dev Returns true if this contract implements the interface defined by interfaceId.
+    */
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -199,8 +199,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev returns the status (in the name tag) of the ticket (and lottery).
-   */
+    * @dev returns the status (in the name tag) of the ticket (and lottery).
+    */
     function getLotteryStatus(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.OPEN) {
             return "Active";
@@ -218,8 +218,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev sets the trait type for indicating the status of the draw.
-   */
+    * @dev sets the trait type for indicating the status of the draw.
+    */
     function getDrawState(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.OVER) {
             if (tokenId == winnerId) {
@@ -237,8 +237,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev mixed on-chain and off-xhain metadata.
-   */
+    * @dev mixed on-chain and off-xhain metadata.
+    */
     function tokenURI(uint256 tokenId) override(ERC721) public view returns (string memory) {
         require(tokenId != 0, "Incorrect token id");
         require(tokenId <= _tokenIdCounter.current(), "Ticket does't exist");
@@ -274,8 +274,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * Hook, which is being used for implementing IERC721Receiver.
-   */
+    * Hook, which is being used for implementing IERC721Receiver.
+    */
     function _beforeTokenTransfer(
         address from, 
         address to, 
