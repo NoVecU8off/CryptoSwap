@@ -415,7 +415,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     ) internal override ifActive ifNotFailed {
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
         
-        uint256 indexOfWinner = randomWords[0] % cti.getSoldTicketsCount() + 1;
+        uint256 indexOfWinner = randomWords[0] % cti.getSoldTicketsCount() + 1; // tickets id's count starts from 1
         uint256 winnerId = indexOfWinner;
         address payable recipient = payable(cti.ownerOf(indexOfWinner));
 
