@@ -139,14 +139,9 @@ interface IERC20 {
 /**
 * @dev Errors.
 */
-error UE(uint256 currentBalance, uint256 numPlayers, bool isDrawProcessActive);
-error TE();
-error SE();
-error FE();
-error DE();
-error OE();
-error ZE();
-
+error UpkeepError(uint256 currentBalance, uint256 numPlayers, bool isDrawProcessActive);
+error TransactionError();
+error RefundError();
 
 /**
 * @title Cryptotron Lottery project ||
@@ -287,7 +282,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     ) external override ifActive ifNotFailed {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
-            revert UE(
+            revert UpkeepError(
                 IERC20(rewardTokenAddress).balanceOf(address(this)),
                 CryptotronTicketInterface(nftAddress).getSoldTicketsCount(),
                 isDrawProcessActive
@@ -356,7 +351,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function refund() public ifActive {
         if (block.timestamp < _drawDate + ONE_DAY_IN_SEC && isDrawFailed == false) {
-            revert();
+            revert RefundError();
         }
 
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
@@ -424,7 +419,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         (bool success) = token.transfer(recipient, amount);
         if (!success) {
             isDrawFailed = true;
-            revert TE();
+            revert TransactionError();
         }
 
         cti.setWinnerId(winnerId);
@@ -448,13 +443,13 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-   * @dev returns the address of the ticket holder participating in the draw.
+   * @dev returns the addresses of the ticket holders participating in the draw.
    * 
    * @notice if you don't get your address via this function, please contact us via email. 
    */
     function getParticipantByTokenId() public view returns (address[] memory) {
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
-        
+
         address[] memory participants = new address[](cti.getSoldTicketsCount());
         for (uint256 tokenId = 1; tokenId < cti.getSoldTicketsCount(); tokenId++) {
             participants[tokenId - 1] = cti.ownerOf(tokenId);
