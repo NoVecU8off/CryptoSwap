@@ -31,8 +31,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     }
 
     /**
-   * @dev Type declarations.
-   */
+     * @dev Type declarations.
+     */
     using Counters for Counters.Counter;
     using Strings for uint256;
     Counters.Counter private _tokenIdCounter;
@@ -83,8 +83,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
    * @dev sets the beuty-looking date in "Traits".
    */
-    function setDrawDate(uint256 _drawDate) external onlyLottery {
-        drawDate = _drawDate;
+    function setDrawDate(uint256 newDrawDate) external onlyLottery {
+        drawDate = newDrawDate;
         emit SetDrawDate(msg.sender);
     }
 
@@ -201,13 +201,17 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
    * @dev returns the status (in the name tag) of the ticket (and lottery).
    */
-    function getLotteryStatus() public view returns (string memory) {
+    function getLotteryStatus(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.OPEN) {
             return "Active";
         } else if (s_lotteryState == lotteryState.PROCESSING) {
             return "Drawing";
         } else if (s_lotteryState == lotteryState.OVER) {
-            return "Ended";
+            if (tokenId == winnerId) {
+                return "Win";
+            } else {
+                return "Ended";
+            }
         } else if (s_lotteryState == lotteryState.REFUNDED) {
             return "Refunded";
         }
@@ -243,7 +247,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
             bytes(string(
                 abi.encodePacked(
                     '{',
-                    '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getLotteryStatus() ,'",',
+                    '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getLotteryStatus(tokenId) ,'",',
                     '"image": "', getImage(tokenId), '",',
                     '"attributes": [{"trait_type": "Chance", "value": "1 to 25" },',
                     '{"trait_type": "Prize", "value": "0.1 ETH" },',

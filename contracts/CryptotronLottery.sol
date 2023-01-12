@@ -41,7 +41,7 @@ interface CryptotronTicketInterface {
     /**
    * @dev sets the time of the next draw.
    */
-    function setDrawDate(uint256 _drawDate) external;
+    function setDrawDate(uint256 newDrawDate) external;
 
     /**
    * @dev sets the winner tokenId.
@@ -171,7 +171,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     address private nullAddress = address(0x0);
     address private nftAddress;
     address private rewardTokenAddress;
-    uint256 private _drawDate;
+    uint256 private newDrawDate;
     bool private isDrawFailed;
     bool private isDrawProcessActive;
     bool private isLotteryActive;
@@ -315,7 +315,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         bytes memory
     ) public view override returns (bool upkeepNeeded, bytes memory) {
         IERC20 token = IERC20(rewardTokenAddress);
-        bool timePassed = block.timestamp > _drawDate;
+        bool timePassed = block.timestamp > newDrawDate;
         bool hasPlayers = CryptotronTicketInterface(nftAddress).getSoldTicketsCount() > 0;
         bool hasBalance = token.balanceOf(address(this)) > 0;
         bool hasGasCoin = address(this).balance > 0;
@@ -333,15 +333,15 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     ) public onlyOwner ifNotFailed ifNotActive {
             nftAddress = newNftAdress;
             rewardTokenAddress = newRewardTokenAddress;
-            _drawDate = newDrawDate;
+            newDrawDate = newDrawDate;
 
             CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
-            cti.setDrawDate(_drawDate);
+            cti.setDrawDate(newDrawDate);
             cti.setStateOpen();
 
             isLotteryActive = true;
             
-            emit LotteryActivated(nftAddress, rewardTokenAddress, _drawDate);
+            emit LotteryActivated(nftAddress, rewardTokenAddress, newDrawDate);
     }
 
     /**
@@ -353,7 +353,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @notice have passed since the scheduled draw date.
    */
     function refund() public ifActive {
-        if (block.timestamp < _drawDate + ONE_DAY_IN_SEC && isDrawFailed == false) {
+        if (block.timestamp < newDrawDate + ONE_DAY_IN_SEC && isDrawFailed == false) {
             revert RefundError();
         }
 
@@ -513,7 +513,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev Returns the value in seconds when the recent draw was played.
    */
     function getDrawDate() public view returns (uint256) {
-        return _drawDate;
+        return newDrawDate;
     }
 
     /**
