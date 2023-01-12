@@ -181,9 +181,9 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
 
     function getImage(uint256 tokenId) public view returns (string memory) {
         if (tokenId == winnerId) {
-            return "https://ipfs.io/ipfs/QmRQYhTUqKez8BdM4UCBZUTntDxRXD9RVxdXb8Czb32mHm?filename=winnerTicket.png";
+            return "https://ipfs.io/ipfs/QmRQYhTUqKez8BdM4UCBZUTntDxRXD9RVxdXb8Czb32mHm?filename=winnerDraw1.png";
         } else {
-            return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png";
+            return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=participantDraw1.png";
         }
     }
 
