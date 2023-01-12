@@ -143,7 +143,7 @@ error UpkeepError(uint256 currentBalance, uint256 numPlayers, bool isDrawProcess
 error TransactionError();
 error RefundError();
 error OwnershipError();
-error FailureStatusError();
+error FailStatusError();
 error ActiveStatusError();
 
 /**
@@ -201,14 +201,14 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
 
     modifier ifNotFailed() {
         if (isDrawFailed == true) {
-            revert FailureStatusError();
+            revert FailStatusError();
         }
         _;
     }
 
     modifier ifFailed() {
         if (isDrawFailed == false) {
-            revert FailureStatusError();
+            revert FailStatusError();
         }
         _;
     }
