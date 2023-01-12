@@ -142,6 +142,9 @@ interface IERC20 {
 error UpkeepError(uint256 currentBalance, uint256 numPlayers, bool isDrawProcessActive);
 error TransactionError();
 error RefundError();
+error OwnershipError();
+error FailureStatusError();
+error ActiveStatusError();
 
 /**
 * @title Cryptotron Lottery project ||
@@ -191,35 +194,35 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     modifier onlyOwner() {
         if (msg.sender != owner) {
-            revert();
+            revert OwnershipError();
         }
         _;
     }
 
     modifier ifNotFailed() {
         if (isDrawFailed == true) {
-            revert();
+            revert FailureStatusError();
         }
         _;
     }
 
     modifier ifFailed() {
         if (isDrawFailed == false) {
-            revert();
+            revert FailureStatusError();
         }
         _;
     }
 
     modifier ifNotActive() {
         if (isLotteryActive == true) {
-            revert();
+            revert ActiveStatusError();
         }
         _;
     }
 
     modifier ifActive() {
         if (isLotteryActive == false) {
-            revert();
+            revert ActiveStatusError();
         }
         _;
     }
