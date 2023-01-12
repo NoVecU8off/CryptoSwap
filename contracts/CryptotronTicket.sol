@@ -18,8 +18,8 @@ import "./Base64.sol";
 /**
  * @dev Custom errors.
  */
-error NoAnOwnerError();
-error NotALotteryError();
+error NoAnOwner();
+error NotALottery();
 
 contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
 
@@ -46,18 +46,30 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     bool public refunded;
 
     /**
+   * @dev events.
+   */
+    event SetDrawDate(address indexed operator);
+    event SetStatusRefunded(address indexed operator);
+    event SetStatusProcessing(address indexed operator);
+    event SetStatusOpen(address indexed operator);
+    event SetStatusOver(address indexed operator);
+    event WinnerIdSet(address indexed operator);
+    event LotteryAddressSet(address indexed operator);
+    event Minted(address indexed recipient);
+
+    /**
    * @dev Modifiers.
    */
     modifier onlyOwner() {
         if (msg.sender != ownerAddress) {
-            revert NoAnOwnerError();
+            revert NoAnOwner();
         }
         _;
     }
 
     modifier onlyLottery() {
         if (msg.sender != lotteryAddress) {
-            revert NotALotteryError();
+            revert NotALottery();
         }
         _;
     }
@@ -74,6 +86,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    */
     function setDrawDate(uint256 _drawDate) external onlyLottery {
         drawDate = _drawDate;
+        emit SetDrawDate(msg.sender);
     }
 
     /**
@@ -81,6 +94,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    */
     function setStateRefunded() external onlyLottery {
         s_lotteryState = lotteryState.REFUNDED;
+        emit SetStatusRefunded(msg.sender);
     }
 
     /**
@@ -88,6 +102,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    */
     function setStateOpen() external onlyLottery {
         s_lotteryState = lotteryState.OPEN;
+        emit SetStatusOpen(msg.sender);
     }
 
     /**
@@ -95,6 +110,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    */
     function setStateProcessing() external onlyLottery {
         s_lotteryState = lotteryState.PROCESSING;
+        emit SetStatusProcessing(msg.sender);
     }
 
     /**
@@ -102,6 +118,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    */
     function setStateOver() external onlyLottery {
         s_lotteryState = lotteryState.OVER;
+        emit SetStatusOver(msg.sender);
     }
 
     /**
@@ -109,6 +126,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
    */
     function setWinnerId(uint256 _winnerId) external onlyLottery {
         winnerId = _winnerId;
+        emit WinnerIdSet(msg.sender);
     }
 
     /**
@@ -128,6 +146,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
         _safeMint(to, tokenId);
+        emit Minted(to);
     }
 
     /**
@@ -139,10 +158,10 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
 
     function getImage(uint256 tokenId) public view returns (string memory) {
         if (tokenId == winnerId) {
-                return "https://ipfs.io/ipfs/QmRQYhTUqKez8BdM4UCBZUTntDxRXD9RVxdXb8Czb32mHm?filename=winnerTicket.png"; //change!
-            } else {
-                return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png";
-            }
+            return "https://ipfs.io/ipfs/QmRQYhTUqKez8BdM4UCBZUTntDxRXD9RVxdXb8Czb32mHm?filename=winnerTicket.png";
+        } else {
+            return "https://ipfs.io/ipfs/QmeDt5otWVSh6u7vTV7odmXB88Ytyd1LWjNjCTAoeLyCd4?filename=nft.png";
+        }
     }
 
     /**

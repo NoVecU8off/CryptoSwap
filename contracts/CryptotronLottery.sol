@@ -148,8 +148,11 @@ error OE();
 error ZE();
 
 
-/**@title Cryptotron project
-* @author Andrey Novikov
+/**
+* @title Cryptotron Lottery project ||
+* @author Andrey Novikov ||
+* @notice If you have any problems, please contact us at
+* @notice andrewnovikoff@outlook.com || 
 */
 contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
 
@@ -166,6 +169,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     
     // VRF unrelated
     uint256 private constant ONE_DAY_IN_SEC = 86400;
+    uint256 private lastRefundDate;
     address payable public owner;
     address private nullAddress = address(0x0);
     address private nftAddress;
@@ -179,14 +183,14 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev Events for the future dev.
    */
     event RandomWordsRequested(uint256 indexed requestId);
-    event PlayerRegistered(address indexed player);
     event WinnerPicked(address indexed winner);
-    event EmergencyRefund(address indexed refunder);
+    event RefundedTo(address indexed recipient);
     event FailureWasReset();
     event NativeCoinFunded(address indexed funder);
     event TokensLanded(address indexed funder, uint256 indexed amount);
     event TokensTransfered(address indexed recipient);
     event LotteryActivated(address indexed newNftAddress, address indexed newRewardTokenAddress, uint256 indexed newDrawDate);
+    event Reset(address indexed reseter);
 
     /**
    * @dev Replacement for the reqire(msg.sender == owner);
@@ -198,24 +202,28 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         _;
     }
 
-    /**
-   * @dev Replacement for the reqire(failure == false);
-   */
-    modifier onlyIfDrawNotFailed() {
+    modifier notFailed() {
         if (isDrawFailed == true) {
             revert();
         }
         _;
     }
 
-    modifier onlyIfLotteryIsNotActive() {
+    modifier isFailed() {
+        if (isDrawFailed == false) {
+            revert();
+        }
+        _;
+    }
+
+    modifier isNotActive() {
         if (isLotteryActive == true) {
             revert();
         }
         _;
     }
 
-    modifier onlyIfLotteryIsActive() {
+    modifier isActive() {
         if (isLotteryActive == false) {
             revert();
         }
@@ -277,7 +285,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function performUpkeep(
         bytes calldata
-    ) external override onlyIfLotteryIsActive onlyIfDrawNotFailed{
+    ) external override isActive notFailed {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
             revert UE(
@@ -325,7 +333,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         address newNftAdress,
         address newRewardTokenAddress,
         uint256 newDrawDate
-    ) public onlyOwner onlyIfDrawNotFailed onlyIfLotteryIsNotActive{
+    ) public onlyOwner notFailed isNotActive {
             nftAddress = newNftAdress;
             rewardTokenAddress = newRewardTokenAddress;
             _drawDate = newDrawDate;
@@ -343,27 +351,27 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev This fuction is for refunding purchased tickets to Cryptotron
    * @dev Function is public, so everyone can call it.
    * @dev Keeps track of callers of this function.
+   * 
+   * @notice You'll only be able to call this function after 24 hours
+   * @notice have passed since the scheduled draw date.
    */
-    function refund() public onlyIfLotteryIsActive{
-        if (isDrawFailed == true || block.timestamp > _drawDate + ONE_DAY_IN_SEC) {
+    function refund() public isFailed {
+        if (block.timestamp > _drawDate + ONE_DAY_IN_SEC) {
             revert();
         }
 
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
-        cti.setStateRefunded();
-
         IERC20 token = IERC20(rewardTokenAddress);
-        if (token.balanceOf(address(this)) != 0) {
-            uint256 refundAmount = (token.balanceOf(address(this)) / cti.getSoldTicketsCount());
-            for (uint i = 0; i < cti.getSoldTicketsCount(); i++) {
-                payable(cti.ownerOf(i)).transfer(refundAmount);
-            }
+        uint256 amount = token.balanceOf(address(this)) / cti.getSoldTicketsCount();
+
+        for (uint256 tokenId = 1; tokenId < cti.getSoldTicketsCount() + 1; tokenId++) {
+            address recipient = payable(cti.ownerOf(tokenId));
+            token.transfer(recipient, amount);
+            emit RefundedTo(recipient);
         }
 
         isDrawFailed = false;
         reset();
-        
-        emit EmergencyRefund(msg.sender);
     }
 
     /**
@@ -405,7 +413,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     function fulfillRandomWords(
         uint256, 
         uint256[] memory randomWords
-    ) internal override onlyIfLotteryIsActive onlyIfDrawNotFailed {
+    ) internal override isActive notFailed {
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
         
         uint256 indexOfWinner = randomWords[0] % cti.getSoldTicketsCount() + 1;
@@ -432,11 +440,24 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev refreshes the states of the lottery (in case of unexpected errors
    * @dev that are not related to the logic and math of this contract).
    */
-    function reset() private onlyIfDrawNotFailed onlyIfLotteryIsActive{
+    function reset() private notFailed isActive {
+        require(msg.sender == address(this), "");
         nftAddress = nullAddress;
         rewardTokenAddress = nullAddress;
         isDrawProcessActive = false;
         isLotteryActive = false;
+        emit Reset(msg.sender);
+    }
+
+    /**
+   * @dev returns the address of the ticket holder participating in the draw.
+   * 
+   * @notice if you don't get your address via this function, please contact us via email. 
+   */
+    function getParticipantByTokenId(uint256 tokenId) public view returns (address) {
+        CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
+        address participant = cti.ownerOf(tokenId);
+        return participant;
     }
 
     /**
@@ -500,6 +521,10 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function getDrawFailedStatus() public view returns (bool) {
         return isDrawFailed;
+    }
+
+    function setToFailed() public onlyOwner {
+        isDrawFailed = true;
     }
 
 }
