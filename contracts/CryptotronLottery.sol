@@ -522,9 +522,4 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     function getDrawFailedStatus() public view returns (bool) {
         return isDrawFailed;
     }
-
-    function setToFailed() public onlyOwner {
-        isDrawFailed = true;
-    }
-
 }
