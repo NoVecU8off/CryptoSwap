@@ -232,9 +232,9 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
             return "Drawing";
         } else if (s_lotteryState == lotteryState.OVER) {
             if (tokenId == winnerId) {
-                return "Win";
+                return "Won";
             } else {
-                return "Ended";
+                return "Drawn";
             }
         } else if (s_lotteryState == lotteryState.REFUNDED) {
             return "Refunded";
