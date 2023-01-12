@@ -452,10 +452,14 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * 
    * @notice if you don't get your address via this function, please contact us via email. 
    */
-    function getParticipantByTokenId(uint256 tokenId) public view returns (address) {
+    function getParticipantByTokenId() public view returns (address[] memory) {
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
-        address participant = cti.ownerOf(tokenId);
-        return participant;
+        
+        address[] memory participants = new address[](cti.getSoldTicketsCount());
+        for (uint256 tokenId = 1; tokenId < cti.getSoldTicketsCount(); tokenId++) {
+            participants[tokenId - 1] = cti.ownerOf(tokenId);
+        }
+        return participants;
     }
 
     /**
