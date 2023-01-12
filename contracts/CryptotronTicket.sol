@@ -107,8 +107,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
     * @dev sets the beuty-looking date in "Traits".
     */
-    function setDrawDate(uint256 passDrawDate) external onlyLottery {
-        drawDate = passDrawDate;
+    function setDrawDate(uint256 minDrawDate) external onlyLottery {
+        drawDate = minDrawDate;
         emit SetDrawDate(msg.sender);
     }
 
