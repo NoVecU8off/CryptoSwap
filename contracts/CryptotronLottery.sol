@@ -440,7 +440,6 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev that are not related to the logic and math of this contract).
    */
     function reset() private ifNotFailed ifActive {
-        require(msg.sender == address(this), "");
         nftAddress = nullAddress;
         rewardTokenAddress = nullAddress;
         isDrawProcessActive = false;
