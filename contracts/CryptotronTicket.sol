@@ -43,7 +43,6 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     uint256 private drawDate;
     uint256 private immutable i_tokensCount = 25;
     bool private isLotteryOver = false;
-    bool public refunded;
 
     /**
    * @dev events.
@@ -226,6 +225,8 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
             }
         } else if (s_lotteryState == lotteryState.PROCESSING) {
             return "Processing";
+        } else if (s_lotteryState == lotteryState.REFUNDED) {
+            return "Refunded";
         } else {
             return "Coming Soon";
         }

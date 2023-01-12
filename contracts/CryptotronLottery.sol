@@ -169,7 +169,6 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     
     // VRF unrelated
     uint256 private constant ONE_DAY_IN_SEC = 86400;
-    uint256 private lastRefundDate;
     address payable public owner;
     address private nullAddress = address(0x0);
     address private nftAddress;
@@ -202,28 +201,28 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         _;
     }
 
-    modifier notFailed() {
+    modifier ifNotFailed() {
         if (isDrawFailed == true) {
             revert();
         }
         _;
     }
 
-    modifier isFailed() {
+    modifier ifFailed() {
         if (isDrawFailed == false) {
             revert();
         }
         _;
     }
 
-    modifier isNotActive() {
+    modifier ifNotActive() {
         if (isLotteryActive == true) {
             revert();
         }
         _;
     }
 
-    modifier isActive() {
+    modifier ifActive() {
         if (isLotteryActive == false) {
             revert();
         }
@@ -285,7 +284,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    */
     function performUpkeep(
         bytes calldata
-    ) external override isActive notFailed {
+    ) external override ifActive ifNotFailed {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if (!upkeepNeeded) {
             revert UE(
@@ -333,7 +332,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
         address newNftAdress,
         address newRewardTokenAddress,
         uint256 newDrawDate
-    ) public onlyOwner notFailed isNotActive {
+    ) public onlyOwner ifNotFailed ifNotActive {
             nftAddress = newNftAdress;
             rewardTokenAddress = newRewardTokenAddress;
             _drawDate = newDrawDate;
@@ -355,8 +354,8 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @notice You'll only be able to call this function after 24 hours
    * @notice have passed since the scheduled draw date.
    */
-    function refund() public isFailed {
-        if (block.timestamp > _drawDate + ONE_DAY_IN_SEC) {
+    function refund() public ifActive {
+        if (block.timestamp < _drawDate + ONE_DAY_IN_SEC || isDrawFailed == false) {
             revert();
         }
 
@@ -413,7 +412,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     function fulfillRandomWords(
         uint256, 
         uint256[] memory randomWords
-    ) internal override isActive notFailed {
+    ) internal override ifActive ifNotFailed {
         CryptotronTicketInterface cti = CryptotronTicketInterface(nftAddress);
         
         uint256 indexOfWinner = randomWords[0] % cti.getSoldTicketsCount() + 1;
@@ -440,7 +439,7 @@ contract CryptotronLottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
    * @dev refreshes the states of the lottery (in case of unexpected errors
    * @dev that are not related to the logic and math of this contract).
    */
-    function reset() private notFailed isActive {
+    function reset() private ifNotFailed ifActive {
         require(msg.sender == address(this), "");
         nftAddress = nullAddress;
         rewardTokenAddress = nullAddress;
