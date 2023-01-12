@@ -229,7 +229,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     */
     function getLotteryStatus(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.PENDING) {
-            return "Pending";
+            return "Inactive";
         } else if (s_lotteryState == lotteryState.OPEN) {
             return "Active";
         } else if (s_lotteryState == lotteryState.PROCESSING) {
