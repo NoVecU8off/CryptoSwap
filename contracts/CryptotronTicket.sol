@@ -227,7 +227,7 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
     * @dev returns the status (in the name tag) of the ticket (and lottery).
     */
-    function getLotteryStatus(uint256 tokenId) public view returns (string memory) {
+    function getTicketStatus(uint256 tokenId) public view returns (string memory) {
         if (s_lotteryState == lotteryState.PENDING) {
             return "Inactive";
         } else if (s_lotteryState == lotteryState.OPEN) {
@@ -277,12 +277,12 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
             bytes(string(
                 abi.encodePacked(
                     '{',
-                    '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getLotteryStatus(tokenId) ,'",',
+                    '"name": "CryptoTron Ticket #', Strings.toString(tokenId), ' ' , unicode"—" , ' ', getTicketStatus(tokenId) ,'",',
                     '"image": "', getImage(tokenId), '",',
                     '"attributes": [{"trait_type": "Chance", "value": "1 to 25" },',
                     '{"trait_type": "Prize", "value": "0.1 ETH" },',
                     '{"trait_type": "Project", "value": "Cryptotron" },',
-                    '{"trait_type": "Ticket Status", "value": "', getDrawState(tokenId), '" },',
+                    '{"trait_type": "Draw State", "value": "', getDrawState(tokenId), '" },',
                     '{"trait_type": "Draw Date", "value": "', getDrawDate(), '" }',
                     '],'
                     '"description": ',
