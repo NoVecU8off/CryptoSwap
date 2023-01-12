@@ -48,6 +48,7 @@ error NotALottery();
 contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
 
     enum lotteryState {
+        PENDING,
         OPEN,
         PROCESSING,
         OVER,
@@ -100,8 +101,9 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     /**
     * @dev {ERC721} default constructor.
     */
-    constructor() ERC721("CryptotronTicket", "CTT") {
+    constructor() ERC721("CryptoTronTicket", "CTT") {
         ownerAddress = payable(msg.sender);
+        s_lotteryState = lotteryState.PENDING;
     }
 
     /**
@@ -226,7 +228,9 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     * @dev returns the status (in the name tag) of the ticket (and lottery).
     */
     function getLotteryStatus(uint256 tokenId) public view returns (string memory) {
-        if (s_lotteryState == lotteryState.OPEN) {
+        if (s_lotteryState == lotteryState.PENDING) {
+            return "Pending";
+        } else if (s_lotteryState == lotteryState.OPEN) {
             return "Active";
         } else if (s_lotteryState == lotteryState.PROCESSING) {
             return "Drawing";
@@ -245,18 +249,20 @@ contract CryptotronTicket is ERC721, ERC721Enumerable, ERC721Burnable {
     * @dev sets the trait type for indicating the status of the draw.
     */
     function getDrawState(uint256 tokenId) public view returns (string memory) {
-        if (s_lotteryState == lotteryState.OVER) {
+        if (s_lotteryState == lotteryState.PENDING) {
+            return "Inactive";
+        } else if (s_lotteryState == lotteryState.OPEN) {
+            return "Coming Soon";
+        } else if (s_lotteryState == lotteryState.PROCESSING) {
+            return "Processing";
+        } else if (s_lotteryState == lotteryState.OVER) {
             if (tokenId == winnerId) {
                 return "Won";
             } else {
                 return "Didn't win";
             }
-        } else if (s_lotteryState == lotteryState.PROCESSING) {
-            return "Processing";
         } else if (s_lotteryState == lotteryState.REFUNDED) {
             return "Refunded";
-        } else {
-            return "Coming Soon";
         }
     }
 
