@@ -1,32 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/*
-                        ::                                                      
-                     .JG&#~                                                     
-                      ?@@@&?                                                    
-                       ~#@@@5                                                   
-                        :G@@@G!!!!!!!!!!!!!!!!!!!!!!:                           
-                          Y@@@@@@@@@@@@@@@@@@@@@@@@@#!                          
-                           75YYYYYYYYYYYYYYYYYYYY5&@@@J                         
-                                                  ^B@@@5.                       
-                                                   .P@@@B^                      
-                     ~~.                             J@@@#!                     
-                    ?@@#Y       .:            :.      !&@@@?                    
-                  .5@@@B~      :B&!          !&B:      ^B@@@5.                  
-                 :B@@@P.      ~#@@@J        J@@@#~      .P@@@B:                 
-                !#@@&J       ?@@@@@@P.    .P@@@@@@?       J&@@#!                
-               ^&@@@5       !@@@@@@@@Y    Y@@@@@@@@!       5@@@&^               
-                !#@@&J       ~B@@@@&?      ?&@@@@B~       J&@@#!                
-                 :G@@@P.       ?&@5:        :5@&?       .P@@@G:                 
-                  .5@@@B^       ^!            !^       ^B@@@5.                  
-                    ?@@@&7                            7&@@@?                    
-                     !#@@@J                          J@@@#!                     
-                      :B@@@P.                      .P@@@B:                      
-                       .5@@@B^                    ^B@@@5.                       
-                         ?@@@&55555555555555555555&@@@?                         
-                          !#@@@@@@@@@@@@@@@@@@@@@@@@#!                          
-*/
-
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
@@ -55,18 +28,20 @@ contract CryptoSwap {
         address initiatorAddress;
         address initiatorTokenAddress;
         uint256 initiatorTokenId;
+        uint256[] counterOfferIds;
         bool agreementReached;
         bool swapSucceed;
     }
 
-    // struct Couneroffer {
-    //     address respondentAddress;
-    //     address responderTokenAddress;
-    //     uint256 responderTokenId;
-    // }
+    struct CounterOffer {
+        address respondentAddress;
+        address respondentTokenAddress;
+        uint256 respondentTokenId;
+    }
 
     mapping(uint => DirectOffer) public directOffers;
     mapping(uint => CommonOffer) public commonOffers;
+    mapping(uint => CounterOffer) public counterOffers;
     mapping(address => uint[]) private directOffersByAddress;
     mapping(address => uint[]) private commonOffersByAddress;
 
@@ -77,13 +52,16 @@ contract CryptoSwap {
     Counters.Counter private directOfferIdCounter;
     Counters.Counter private commonOfferIdCounter;
     Counters.Counter private transactionIdCounter;
+    Counters.Counter private counterOfferIdCounter;
 
-    uint256 directOfferId;
-    uint256 commonOfferId;
-    uint256 transactionId;
+    uint256 private directOfferId;
+    uint256 private commonOfferId;
+    uint256 private counterOfferId;
+    uint256 private transactionId;
 
     event NewDirectOffer(address indexed initiator, DirectOffer directOffer);
     event NewCommonOffer(address indexed initiator, CommonOffer commonOffer);
+    event NewCounterOffer(address indexed respondent, CounterOffer counterOffer);
     event OfferTermsAccepted(address indexed respondent);
     event OfferTermsNotAccepted(address indexed respondent);
     event InitiatorTokenTransfered(uint256 indexed transactionId);
@@ -137,34 +115,7 @@ contract CryptoSwap {
 
     }
 
-    function createCommonOffer(address _initiatorTokenAddress, uint256 _initiatorTokenId) public {
-
-        token = ERC721(_initiatorTokenAddress);
-
-        if (msg.sender != token.ownerOf(_initiatorTokenId)) {
-            revert();
-        } else if (_exists(_initiatorTokenId, _initiatorTokenAddress) != true) {
-            revert();
-        }
-
-        commonOfferIdCounter.increment();
-        commonOfferId = commonOfferIdCounter.current();
-
-        commonOffers[commonOfferId] = CommonOffer(
-            msg.sender,
-            _initiatorTokenAddress,
-            _initiatorTokenId,
-            false,
-            false
-        );
-
-        commonOffersByAddress[msg.sender].push(commonOfferId);
-
-        emit NewCommonOffer(msg.sender, commonOffers[commonOfferId]);
-
-    }
-
-    function acceptDirectOffer(uint256 _directOfferId, bool _yourResponse) public {
+    function respondToDirectOffer(uint256 _directOfferId, bool _yourResponse) public {
 
         if (msg.sender != directOffers[_directOfferId].recipientAddress) {
             revert();
@@ -220,25 +171,69 @@ contract CryptoSwap {
 
     }
 
-    // function createResponseOffer(
-    //     uint256 _commonOfferId,
-    //     address _responderTokenAddress,
-    //     uint256 _responderTokenId
-    // )
-    // public
-    // {
+    function createCommonOffer(address _initiatorTokenAddress, uint256 _initiatorTokenId) public {
 
-    //     token = ERC721(_responderTokenAddress);
+        token = ERC721(_initiatorTokenAddress);
 
-    //     if (msg.sender != token.ownerOf(_responderTokenId)) {
-    //         revert();
-    //     } else if (_exists(_responderTokenId, _responderTokenAddress) != true) {
-    //         revert();
-    //     }
+        if (msg.sender != token.ownerOf(_initiatorTokenId)) {
+            revert();
+        } else if (_exists(_initiatorTokenId, _initiatorTokenAddress) != true) {
+            revert();
+        }
 
-        
+        commonOfferIdCounter.increment();
+        commonOfferId = commonOfferIdCounter.current();
 
-    // }
+        commonOffers[commonOfferId] = CommonOffer(
+            msg.sender,
+            _initiatorTokenAddress,
+            _initiatorTokenId,
+            new uint256[](0),
+            false,
+            false
+        );
+
+        commonOffersByAddress[msg.sender].push(commonOfferId);
+
+        emit NewCommonOffer(msg.sender, commonOffers[commonOfferId]);
+
+    }
+
+    function createCounterOffer(
+        uint256 _commonOfferId,
+        address _respondentTokenAddress,
+        uint256 _respondentTokenId
+    )
+    public
+    {
+
+        token = ERC721(_respondentTokenAddress);
+
+        if (msg.sender != token.ownerOf(_respondentTokenId)) {
+            revert();
+        } else if (_exists(_respondentTokenId, _respondentTokenAddress) != true) {
+            revert();
+        }
+
+        counterOfferIdCounter.increment();
+        counterOfferId = counterOfferIdCounter.current();
+        commonOffers[_commonOfferId].counterOfferIds.push(counterOfferId);
+
+        counterOffers[counterOfferId].respondentAddress = msg.sender;
+        counterOffers[counterOfferId].respondentTokenAddress = _respondentTokenAddress;
+        counterOffers[counterOfferId].respondentTokenId = _respondentTokenId;
+
+        emit NewCounterOffer(msg.sender, counterOffers[counterOfferId]);
+
+    }
+
+    function respondToCounterOffer(uint256 _counterOfferId) public {
+
+        if (msg.sender != commonOffers[]) {
+
+        }
+
+    }
 
     function getDirectOffersIdsByAddress(address _initiatorAddress) public view returns(uint[] memory) {
         return directOffersByAddress[_initiatorAddress];
