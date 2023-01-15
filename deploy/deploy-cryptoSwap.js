@@ -17,7 +17,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 
     log("----------------------------------------------------")
     const arguments = []
-    const CryptotronTicket = await deploy("CryptotronTicket", {
+    const CryptoSwap = await deploy("CryptoSwap", {
         from: deployer,
         args: arguments,
         log: true,
@@ -27,10 +27,10 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     // Verify the deployment
     if (!developmentChains.includes(network.name) && process.env.ETHERSCAN_API_KEY && process.env.POLYGONSCAN_API_KEY) {
         log("Verifying...")
-        await verify(CryptotronTicket.address, arguments)
+        await verify(CryptoSwap.address, arguments)
     }
 
     log("----------------------------------------------------")
 }
 
-module.exports.tags = ["all", "CryptotronTicket"]
+module.exports.tags = ["all", "CryptoSwap"]
