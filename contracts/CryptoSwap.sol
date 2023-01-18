@@ -8,8 +8,14 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 error NotAnOwner();
 error NullAddress();
 error TokenDoesNotExist();
+error NotRecipient();
+error TermsNotAccepted();
+error TokenNotApproved();
+error YouAreNotInitiator();
+error OfferDoesNotExist();
+error YouAreNotCounter();
 
-contract CryptoSwap {
+contract swap {
 
     using Counters for Counters.Counter;
 
@@ -39,33 +45,31 @@ contract CryptoSwap {
         uint256 counterTokenId;
     }
 
-    mapping(uint => DirectOffer) public directOffers;
-    mapping(uint => CommonOffer) public commonOffers;
-    mapping(uint => CounterOffer) public counterOffers;
-    mapping(address => uint[]) private directOffersByAddress;
-    mapping(address => uint[]) private commonOffersByAddress;
-
-    ERC721 private token;
-    ERC721 private tokenA;
-    ERC721 private tokenB;
+    mapping(uint => DirectOffer) public directOfferById;
+    mapping(uint => CommonOffer) public commonOfferById;
+    mapping(uint => CounterOffer) public counterOfferById;
+    mapping(address => uint[]) private directOfferIDsByAddress;
+    mapping(address => uint[]) private directOfferIDsToAddress;
+    mapping(address => uint[]) private commonOfferIDsByAddress;
+    mapping(uint => uint[]) private counterOfferIDsToCommonOffer;
 
     Counters.Counter private directOfferIdCounter;
     Counters.Counter private commonOfferIdCounter;
-    Counters.Counter private transactionIdCounter;
+    Counters.Counter private transferIdCounter;
     Counters.Counter private counterOfferIdCounter;
 
     uint256 private directOfferId;
     uint256 private commonOfferId;
     uint256 private counterOfferId;
-    uint256 private transactionId;
+    uint256 private transferId;
 
-    event NewDirectOffer(address indexed initiator, DirectOffer directOffer);
-    event NewCommonOffer(address indexed initiator, CommonOffer commonOffer);
-    event NewCounterOffer(address indexed respondent, CounterOffer counterOffer);
-    event OfferTermsAccepted(address indexed respondent);
-    event OfferTermsNotAccepted(address indexed respondent);
-    event InitiatorTokenTransfered(uint256 indexed transactionId);
-    event RecipientTokenTransfered(uint256 indexed transactionId);
+    event NewDirectOfferBy(address indexed initiator, uint256 indexed offerId);
+    event NewCommonOfferBy(address indexed initiator, uint256 indexed offerId);
+    event NewCounterOfferBy(address indexed respondent, uint256 indexed offerId);
+    event OfferTermsAccepted(address indexed respondent, uint256 indexed offerId);
+    event OfferTermsNotAccepted(address indexed respondent, uint256 indexed offerId);
+    event InitiatorTokenTransfered(uint256 indexed transferId, address indexed from, address indexed to);
+    event RecipientTokenTransfered(uint256 indexed transferId, address indexed from, address indexed to);
 
     function createDirectOffer(
         address _initiatorTokenAddress,
@@ -76,29 +80,31 @@ contract CryptoSwap {
     )
         public
     {
+        
+        ERC721 token;
 
         token = ERC721(_initiatorTokenAddress);
 
         if (msg.sender != token.ownerOf(_initiatorTokenId)) {
-            revert();
+            revert NotAnOwner();
         } else if (_exists(_initiatorTokenId, _initiatorTokenAddress) != true) {
-            revert();
+            revert TokenDoesNotExist();
         }
 
         token = ERC721(_recipientTokenAddress);
 
         if (_recipientAddress == address(0)) {
-            revert();
+            revert NullAddress();
         } else if (_recipientAddress != token.ownerOf(_recipientTokenId)) {
-            revert();
+            revert NotAnOwner();
         } else if (_exists(_recipientTokenId, _recipientTokenAddress) != true) {
-            revert();
+            revert TokenDoesNotExist();
         }
 
         directOfferIdCounter.increment();
         directOfferId = directOfferIdCounter.current();
 
-        directOffers[directOfferId] = DirectOffer(
+        directOfferById[directOfferId] = DirectOffer(
             msg.sender,
             _initiatorTokenAddress,
             _initiatorTokenId,
@@ -109,76 +115,95 @@ contract CryptoSwap {
             false
         );
 
-        directOffersByAddress[msg.sender].push(directOfferId);
+        directOfferIDsByAddress[msg.sender].push(directOfferId);
+        directOfferIDsToAddress[_recipientAddress].push(directOfferId);
 
-        emit NewDirectOffer(msg.sender, directOffers[directOfferId]);
+        emit NewDirectOfferBy(msg.sender, directOfferId);
 
     }
 
     function respondToDirectOffer(uint256 _directOfferId, bool _yourResponse) public {
 
-        if (msg.sender != directOffers[_directOfferId].recipientAddress) {
-            revert();
+        if (msg.sender != directOfferById[_directOfferId].recipientAddress) {
+            revert NotRecipient();
+        } else if (_checkDirectOfferExists(_directOfferId) != true) {
+            revert OfferDoesNotExist();
         }
 
-        directOffers[_directOfferId].termsAcceptedByRecipient = _yourResponse;
+        directOfferById[_directOfferId].termsAcceptedByRecipient = _yourResponse;
 
         if (_yourResponse == true) {
-            emit OfferTermsAccepted(msg.sender);
+            emit OfferTermsAccepted(msg.sender, _directOfferId);
         } else {
-            emit OfferTermsNotAccepted(msg.sender);
+            emit OfferTermsNotAccepted(msg.sender, _directOfferId);
         }
 
     }
 
     function executeDirectOffer(uint256 _directOfferId) public {
 
-        if (msg.sender != directOffers[_directOfferId].recipientAddress) {
-            revert();
-        } else if (directOffers[_directOfferId].termsAcceptedByRecipient != true) {
-            revert();
+        if (msg.sender != directOfferById[_directOfferId].recipientAddress) {
+            revert NotRecipient();
+        } else if (directOfferById[_directOfferId].termsAcceptedByRecipient != true) {
+            revert TermsNotAccepted();
         }
 
-        tokenA = ERC721(directOffers[_directOfferId].initiatorTokenAddress);
-        tokenB = ERC721(directOffers[_directOfferId].recipientTokenAddress);
+        ERC721 tokenA;
+        ERC721 tokenB;
 
-        if (tokenA.getApproved(directOffers[_directOfferId].initiatorTokenId) != address(this)) {
-            revert();
-        } else if (tokenB.getApproved(directOffers[_directOfferId].recipientTokenId) != address(this)) {
-            revert();
+        tokenA = ERC721(directOfferById[_directOfferId].initiatorTokenAddress);
+        tokenB = ERC721(directOfferById[_directOfferId].recipientTokenAddress);
+
+        if (tokenA.getApproved(directOfferById[_directOfferId].initiatorTokenId) != address(this)) {
+            revert TokenNotApproved();
+        } else if (tokenB.getApproved(directOfferById[_directOfferId].recipientTokenId) != address(this)) {
+            revert TokenNotApproved();
         } else {
             tokenA.safeTransferFrom(
-                directOffers[_directOfferId].initiatorAddress,
-                directOffers[_directOfferId].recipientAddress,
-                directOffers[_directOfferId].initiatorTokenId
+                directOfferById[_directOfferId].initiatorAddress,
+                directOfferById[_directOfferId].recipientAddress,
+                directOfferById[_directOfferId].initiatorTokenId
             );
 
-            transactionIdCounter.increment();
-            transactionId = transactionIdCounter.current();
+            transferIdCounter.increment();
+            transferId = transferIdCounter.current();
 
-            emit InitiatorTokenTransfered(transactionId);
+            emit InitiatorTokenTransfered(
+                transferId,
+                directOfferById[_directOfferId].initiatorAddress,
+                directOfferById[_directOfferId].recipientAddress
+            );
 
             tokenB.safeTransferFrom(
-                directOffers[_directOfferId].recipientAddress,
-                directOffers[_directOfferId].initiatorAddress,
-                directOffers[_directOfferId].initiatorTokenId
+                directOfferById[_directOfferId].recipientAddress,
+                directOfferById[_directOfferId].initiatorAddress,
+                directOfferById[_directOfferId].initiatorTokenId
             );
 
-            emit RecipientTokenTransfered(transactionId);
+            transferIdCounter.increment();
+            transferId = transferIdCounter.current();
 
-            directOffers[_directOfferId].swapSucceed = true;
+            emit RecipientTokenTransfered(
+                transferId,
+                directOfferById[_directOfferId].recipientAddress,
+                directOfferById[_directOfferId].initiatorAddress
+            );
+
+            directOfferById[_directOfferId].swapSucceed = true;
         }
 
     }
 
     function createCommonOffer(address _initiatorTokenAddress, uint256 _initiatorTokenId) public {
 
+        ERC721 token;
+
         token = ERC721(_initiatorTokenAddress);
 
         if (msg.sender != token.ownerOf(_initiatorTokenId)) {
-            revert();
+            revert NotAnOwner();
         } else if (_exists(_initiatorTokenId, _initiatorTokenAddress) != true) {
-            revert();
+            revert TokenDoesNotExist();
         }
 
         uint256[] memory counterOfferIds = new uint256[](0);
@@ -186,19 +211,18 @@ contract CryptoSwap {
         commonOfferIdCounter.increment();
         commonOfferId = commonOfferIdCounter.current();
 
-        commonOffers[commonOfferId] = CommonOffer(
+        commonOfferById[commonOfferId] = CommonOffer(
             msg.sender,
             _initiatorTokenAddress,
             _initiatorTokenId,
-            // new address[](0),
             counterOfferIds,
             false,
             false
         );
 
-        commonOffersByAddress[msg.sender].push(commonOfferId);
+        commonOfferIDsByAddress[msg.sender].push(commonOfferId);
 
-        emit NewCommonOffer(msg.sender, commonOffers[commonOfferId]);
+        emit NewCommonOfferBy(msg.sender, commonOfferId);
 
     }
 
@@ -210,101 +234,134 @@ contract CryptoSwap {
     public
     {
 
+        ERC721 token;
+
         token = ERC721(_counterTokenAddress);
 
         if (msg.sender != token.ownerOf(_counterTokenId)) {
-            revert();
+            revert NotAnOwner();
         } else if (_exists(_counterTokenId, _counterTokenAddress) != true) {
-            revert();
+            revert TokenDoesNotExist();
+        } else if (_checkCommonOfferExists(_commonOfferId) != true) {
+            revert OfferDoesNotExist();
         }
 
         counterOfferIdCounter.increment();
         counterOfferId = counterOfferIdCounter.current();
-        // commonOffers[_commonOfferId].counterAddresses.push(msg.sender);
-        commonOffers[_commonOfferId].counterOfferIds.push(counterOfferId);
+        commonOfferById[_commonOfferId].counterOfferIds.push(counterOfferId);
 
-        counterOffers[counterOfferId].counterAddress = msg.sender;
-        counterOffers[counterOfferId].counterTokenAddress = _counterTokenAddress;
-        counterOffers[counterOfferId].counterTokenId = _counterTokenId;
+        counterOfferById[counterOfferId].counterAddress = msg.sender;
+        counterOfferById[counterOfferId].counterTokenAddress = _counterTokenAddress;
+        counterOfferById[counterOfferId].counterTokenId = _counterTokenId;
 
-        emit NewCounterOffer(msg.sender, counterOffers[counterOfferId]);
+        counterOfferIDsToCommonOffer[_commonOfferId].push(counterOfferId);
+
+        emit NewCounterOfferBy(msg.sender, counterOfferId);
 
     }
 
     function respondToCounterOffer(uint256 _yourCommonOfferId, uint256 _counterOfferId, bool _yourResponse) public {
 
-        if (msg.sender != commonOffers[_yourCommonOfferId].initiatorAddress) {
-            revert();
-        } else if ( _checkCounterExists(_counterOfferId, _yourCommonOfferId) != true) {
-            revert();
+        if (msg.sender != commonOfferById[_yourCommonOfferId].initiatorAddress) {
+            revert YouAreNotInitiator();
+        } else if ( _checkCounterOfferExists(_counterOfferId, _yourCommonOfferId) != true) {
+            revert OfferDoesNotExist();
         } else if (_yourResponse == true) {
-            commonOffers[_yourCommonOfferId].agreementReached = true;
+            commonOfferById[_yourCommonOfferId].agreementReached = true;
         } else {
-            commonOffers[_yourCommonOfferId].agreementReached = false;
+            commonOfferById[_yourCommonOfferId].agreementReached = false;
         }
 
     }
 
     function executeCommonOffer(uint256 _commonOfferId, uint256 _counterOfferId) public {
 
-        if (msg.sender != commonOffers[_commonOfferId].initiatorAddress) {
-            revert();
-        } else if (commonOffers[_commonOfferId].agreementReached != true) {
-            revert();
+        if (msg.sender != counterOfferById[_counterOfferId].counterAddress) {
+            revert YouAreNotCounter();
+        } else if (commonOfferById[_commonOfferId].agreementReached != true) {
+            revert TermsNotAccepted();
         }
 
-        tokenA = ERC721(commonOffers[_commonOfferId].initiatorTokenAddress);
-        tokenB = ERC721(counterOffers[_counterOfferId].counterTokenAddress);
+        ERC721 tokenA;
+        ERC721 tokenB;
 
-        if (tokenA.getApproved(commonOffers[_commonOfferId].initiatorTokenId) != address(this)) {
-            revert();
-        } else if (tokenB.getApproved(counterOffers[_counterOfferId].counterTokenId) != address(this)) {
-            revert();
+        tokenA = ERC721(commonOfferById[_commonOfferId].initiatorTokenAddress);
+        tokenB = ERC721(counterOfferById[_counterOfferId].counterTokenAddress);
+
+        if (tokenA.getApproved(commonOfferById[_commonOfferId].initiatorTokenId) != address(this)) {
+            revert TokenNotApproved();
+        } else if (tokenB.getApproved(counterOfferById[_counterOfferId].counterTokenId) != address(this)) {
+            revert TokenNotApproved();
         } else {
             tokenA.safeTransferFrom(
-                commonOffers[_commonOfferId].initiatorAddress,
-                counterOffers[_counterOfferId].counterAddress,
-                commonOffers[_commonOfferId].initiatorTokenId
+                commonOfferById[_commonOfferId].initiatorAddress,
+                counterOfferById[_counterOfferId].counterAddress,
+                commonOfferById[_commonOfferId].initiatorTokenId
             );
 
-            transactionIdCounter.increment();
-            transactionId = transactionIdCounter.current();
+            transferIdCounter.increment();
+            transferId = transferIdCounter.current();
 
-            emit InitiatorTokenTransfered(transactionId);
+            emit InitiatorTokenTransfered(
+                transferId,
+                commonOfferById[_commonOfferId].initiatorAddress,
+                counterOfferById[_counterOfferId].counterAddress
+            );
 
             tokenB.safeTransferFrom(
-                counterOffers[_counterOfferId].counterAddress,
-                commonOffers[_commonOfferId].initiatorAddress,
-                counterOffers[_counterOfferId].counterTokenId
+                counterOfferById[_counterOfferId].counterAddress,
+                commonOfferById[_commonOfferId].initiatorAddress,
+                counterOfferById[_counterOfferId].counterTokenId
             );
 
-            emit RecipientTokenTransfered(transactionId);
+            emit RecipientTokenTransfered(
+                transferId,
+                counterOfferById[_counterOfferId].counterAddress,
+                commonOfferById[_commonOfferId].initiatorAddress
+            );
 
-            commonOffers[_commonOfferId].swapSucceed = true;
+            commonOfferById[_commonOfferId].swapSucceed = true;
         }
 
     }
 
-    function _checkCounterExists(uint256 _counterOfferId, uint256 _commonOfferId) internal virtual returns (bool) {
-        for (uint256 i = 0; i < commonOffers[_commonOfferId].counterOfferIds.length; i++) {
-            if (commonOffers[_commonOfferId].counterOfferIds[i] == _counterOfferId) {
+    function getDirectOffersIDsByAddress(address _initiatorAddress) public view returns (uint[] memory) {
+        return directOfferIDsByAddress[_initiatorAddress];
+    }
+
+    function getDirectOffersIDsToAddress(address _recipientAddress) public view returns (uint[] memory) {
+        return directOfferIDsToAddress[_recipientAddress];
+    }
+
+    function getCommonOffersIDsByAddress(address _initiatorAddress) public view returns (uint[] memory) {
+        return commonOfferIDsByAddress[_initiatorAddress];
+    }
+
+    function getCounterOfferIDsToCommonOfferID(uint256 _commonOfferId) public view returns(uint[] memory) {
+        return counterOfferIDsToCommonOffer[_commonOfferId];
+    }
+
+    function _exists(uint256 _tokenId, address _tokenAddress) internal virtual returns (bool) {
+        ERC721 token;
+        token = ERC721(_tokenAddress);
+        return token.ownerOf(_tokenId) != address(0);
+    }
+
+    function _checkDirectOfferExists(uint256 _directOfferId) internal view returns (bool) {
+        return directOfferById[_directOfferId].initiatorAddress != address(0);
+    }
+
+    function _checkCommonOfferExists(uint256 _commonOfferId) internal view returns (bool) {
+        return commonOfferById[_commonOfferId].initiatorAddress != address(0);
+    }
+
+    function _checkCounterOfferExists(uint256 _counterOfferId, uint256 _commonOfferId) internal view returns (bool) {
+        for (uint256 i = 0; i < commonOfferById[_commonOfferId].counterOfferIds.length; i++) {
+            if (commonOfferById[_commonOfferId].counterOfferIds[i] == _counterOfferId) {
                 return true;
             } 
         }
         return false;
-    }
-
-    function getDirectOffersIdsByAddress(address _initiatorAddress) public view returns(uint[] memory) {
-        return directOffersByAddress[_initiatorAddress];
-    }
-
-    function getCommonOffersIdsByAddress(address _initiatorAddress) public view returns(uint[] memory) {
-        return commonOffersByAddress[_initiatorAddress];
-    }
-
-    function _exists(uint256 _tokenId, address _tokenAddress) internal virtual returns (bool) {
-        token = ERC721(_tokenAddress);
-        return token.ownerOf(_tokenId) != address(0);
     }
 
 }
